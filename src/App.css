@@ -1,0 +1,22 @@
+.scene-map-wrap { overflow: hidden; border: 1px solid rgb(39 39 42); border-radius: 14px; background: rgb(9 9 11); }
+.scene-map-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 12px; border-bottom: 1px solid rgb(39 39 42); color: rgb(113 113 122); font-size: 12px; }
+.scene-map-actions { display: flex; align-items: center; gap: 7px; }
+.scene-map-actions button { border: 1px solid rgb(63 63 70); background: rgb(24 24 27); color: rgb(212 212 216); border-radius: 7px; padding: 4px 9px; cursor: pointer; }
+.scene-map-actions button:hover { background: rgb(39 39 42); }
+.scene-map { height: min(68vh, 760px); min-height: 500px; overflow: hidden; cursor: grab; position: relative; background-image: radial-gradient(rgb(39 39 42) 1px, transparent 1px); background-size: 24px 24px; touch-action: none; }
+.scene-map:active { cursor: grabbing; }
+.scene-map-world { position: absolute; inset: 0; transform-origin: 0 0; }
+.scene-map-edges { position: absolute; left: 0; top: 0; overflow: visible; color: rgb(113 113 122); pointer-events: none; }
+.scene-map-edge path { fill: none; stroke: currentColor; stroke-width: 2; opacity: .75; }
+.scene-map-edge text { fill: rgb(161 161 170); font-size: 12px; text-anchor: middle; paint-order: stroke; stroke: rgb(9 9 11); stroke-width: 4px; }
+.scene-map-node { position: absolute; display: flex; flex-direction: column; align-items: flex-start; gap: 7px; box-sizing: border-box; padding: 14px; text-align: left; color: white; border: 1px solid rgb(63 63 70); border-radius: 12px; background: rgb(24 24 27); box-shadow: 0 8px 24px rgb(0 0 0 / .28); cursor: grab; }
+.scene-map-node:hover { border-color: rgb(113 113 122); }
+.scene-map-node:active { cursor: grabbing; }
+.scene-map-node-prompt { border-color: rgb(161 98 7); background: linear-gradient(180deg, rgb(39 32 20), rgb(24 24 27)); }
+.scene-map-node-router { border-color: rgb(22 101 52); background: linear-gradient(180deg, rgb(20 39 28), rgb(24 24 27)); }
+.scene-map-node-number { position: absolute; right: 12px; top: 10px; color: rgb(113 113 122); font-size: 11px; }
+.scene-map-node-type { font-size: 10px; font-weight: 700; letter-spacing: .12em; color: rgb(161 161 170); }
+.scene-map-node strong { padding-right: 25px; font-size: 15px; line-height: 1.3; }
+.scene-map-node-preview { display: -webkit-box; overflow: hidden; color: rgb(161 161 170); font-size: 12px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+line-clamp: 2; }
+.scene-map-node-choices { margin-top: auto; color: rgb(251 191 36); font-size: 11px; }
