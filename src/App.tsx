@@ -113,6 +113,7 @@ function App() {
 
         {selectedItem ? (
           <SceneEditor
+            key={selectedItem}
             name={selectedItem}
             data={content[selectedItem]}
             onChange={(updatedData) => {
