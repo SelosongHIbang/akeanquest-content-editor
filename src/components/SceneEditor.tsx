@@ -7,6 +7,8 @@ type SceneEditorProps = {
   name: string;
   data: Scene | IdlePool;
   onChange: (updatedData: Scene | IdlePool) => void;
+  onAddScene?: () => void;
+  onSave?: () => void;
 };
 
 type Point = { x: number; y: number };
@@ -545,7 +547,7 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
   );
 }
 
-export default function SceneEditor({ name, data, onChange }: SceneEditorProps) {
+export default function SceneEditor({ name, data, onChange, onAddScene, onSave }: SceneEditorProps) {
   const [selected, setSelected] = useState<SelectedNode | null>(isScene(data) && data.length ? { kind: "scene", sceneIndex: 0 } : null);
 
   if (!isScene(data)) return <div className="scene-idle-view"><h2>{name}</h2><pre>{JSON.stringify(data, null, 2)}</pre></div>;
@@ -589,7 +591,7 @@ export default function SceneEditor({ name, data, onChange }: SceneEditorProps) 
 
   return (
     <div className="scene-editor-shell">
-      <div className="scene-editor-titlebar"><div><strong>{name}</strong><span>{data.length} nodes</span></div></div>
+      <div className="scene-editor-titlebar"><div><strong>{name}</strong><span>{data.length} nodes</span><span className="save-status">● Draft saved locally</span></div><div className="scene-editor-actions"><button type="button" onClick={onAddScene}>+ Scene</button><button type="button" className="save-button" onClick={onSave}>Save JSON</button></div></div>
       <div className="scene-editor-body">
         <SceneMap scene={data} selected={selected} onSelect={setSelected} />
         <SceneInspector scene={data} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} />
