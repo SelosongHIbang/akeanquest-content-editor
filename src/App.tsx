@@ -55,15 +55,10 @@ function App() {
       <header className="file-toolbar">
         <div className="file-toolbar-brand">AkeanQuest <span>Content Editor</span></div>
         <nav className="editor-tabs" aria-label="Editor tabs"><button type="button" className={activeTab === "scenes" ? "active" : ""} onClick={() => setActiveTab("scenes")}>Scenes</button><button type="button" className={activeTab === "word-bank" ? "active" : ""} onClick={() => setActiveTab("word-bank")}>Word Bank</button></nav>
-        <div className="file-toolbar-actions">
-          {activeTab === "scenes" && <button type="button" onClick={handleAddScene}>+ Scene</button>}
-          <span className="save-status">● Draft saved locally</span>
-          <button type="button" className="save-button" onClick={handleSave}>Save JSON</button>
-        </div>
       </header>
 
       <div className="editor-workspace">
-        {activeTab === "scenes" ? (<><Sidebar items={items} selectedItem={selectedItem} onSelect={setSelectedItem} /><main className="editor-main">{selectedItem ? <SceneEditor key={selectedItem} name={selectedItem} data={content[selectedItem]} onChange={(updatedData) => setContent({ ...content, [selectedItem]: updatedData })} /> : <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>}</main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
+        {activeTab === "scenes" ? (<><Sidebar items={items} selectedItem={selectedItem} onSelect={setSelectedItem} /><main className="editor-main">{selectedItem ? <SceneEditor key={selectedItem} name={selectedItem} data={content[selectedItem]} onChange={(updatedData) => setContent({ ...content, [selectedItem]: updatedData })} onAddScene={handleAddScene} onSave={handleSave} /> : <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>}</main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
       </div>
     </div>
   );
