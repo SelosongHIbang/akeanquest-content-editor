@@ -49,6 +49,7 @@ function App() {
     }
     return bundledChapters;
   });
+  const [selectedChapterId, setSelectedChapterId] = useState("chapter1");
   const [selectedScene, setSelectedScene] = useState<SelectedScene>(null);
   const [activeTab, setActiveTab] = useState<"scenes" | "word-bank">("scenes");
   const [wordBank, setWordBank] = useState<WordBank>(() => {
@@ -98,7 +99,7 @@ function App() {
       </header>
 
       <div className="editor-workspace">
-        {activeTab === "scenes" ? (<><Sidebar chapters={chapters} selectedScene={selectedScene} onSelect={setSelectedScene} /><main className="editor-main">{selectedScene && selectedData ? <SceneEditor key={selectedScene.chapterId + ":" + selectedScene.sceneName} name={selectedScene.sceneName} data={selectedData} onChange={(updatedData) => setChapters({ ...chapters, [selectedScene.chapterId]: { ...chapters[selectedScene.chapterId], [selectedScene.sceneName]: updatedData } })} onAddScene={handleAddScene} onSave={handleSave} /> : <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>}</main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
+        {activeTab === "scenes" ? (<><Sidebar chapters={chapters} selectedChapterId={selectedChapterId} selectedScene={selectedScene} onChapterChange={(chapterId) => { setSelectedChapterId(chapterId); setSelectedScene(null); }} onSelect={setSelectedScene} /><main className="editor-main">{selectedScene && selectedData ? <SceneEditor key={selectedScene.chapterId + ":" + selectedScene.sceneName} name={selectedScene.sceneName} data={selectedData} onChange={(updatedData) => setChapters({ ...chapters, [selectedScene.chapterId]: { ...chapters[selectedScene.chapterId], [selectedScene.sceneName]: updatedData } })} onAddScene={handleAddScene} onSave={handleSave} /> : <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>}</main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
       </div>
     </div>
   );
