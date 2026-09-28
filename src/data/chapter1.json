@@ -2,7 +2,7 @@
   "scene_1_a_house_abroad_evening": [
     {
       "start_index_if_flag": {
-        "default": 0
+        "default": 1
       },
       "type": "start_router"
     },
