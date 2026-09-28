@@ -8,13 +8,14 @@ type SidebarProps = {
   selectedScene: SelectedScene;
   onChapterChange: (chapterId: string) => void;
   onSelect: (scene: SelectedScene) => void;
+  onAddScene: () => void;
 };
 
 function chapterLabel(id: string) {
   return id.replace("chapter", "Chapter ");
 }
 
-export default function Sidebar({ chapters, selectedChapterId, selectedScene, onChapterChange, onSelect }: SidebarProps) {
+export default function Sidebar({ chapters, selectedChapterId, selectedScene, onChapterChange, onSelect, onAddScene }: SidebarProps) {
   const chapter = chapters[selectedChapterId];
 
   return (
@@ -31,7 +32,7 @@ export default function Sidebar({ chapters, selectedChapterId, selectedScene, on
           ))}
         </select>
       </div>
-      <div className="file-explorer-section"><span>SCENES</span></div>
+      <div className="file-explorer-section file-explorer-scenes-header"><span>SCENES</span><button type="button" className="file-explorer-add" onClick={onAddScene} aria-label="Add scene">+</button></div>
       <nav className="file-explorer-list">
         {chapter && Object.keys(chapter).map((item) => (
           <button key={item} type="button" onClick={() => onSelect({ chapterId: selectedChapterId, sceneName: item })} className={selectedScene?.chapterId === selectedChapterId && selectedScene.sceneName === item ? "selected" : ""}>
