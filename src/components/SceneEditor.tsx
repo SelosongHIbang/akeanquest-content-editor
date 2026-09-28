@@ -548,9 +548,9 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
 }
 
 export default function SceneEditor({ name, data, onChange, onSave, onArchive }: SceneEditorProps) {
-  const [selected, setSelected] = useState<SelectedNode | null>(isScene(data ?? []) && data.length ? { kind: "scene", sceneIndex: 0 } : null);
-  const hasSelection = data !== null;
   const sceneData = data && isScene(data) ? data : null;
+  const [selected, setSelected] = useState<SelectedNode | null>(sceneData?.length ? { kind: "scene", sceneIndex: 0 } : null);
+  const hasSelection = data !== null;
 
   function updateNode(index: number, node: DialogueNodeType | StartRouter) {
     if (!sceneData) return;
