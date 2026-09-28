@@ -83,41 +83,43 @@ function autoLayout(scene: Scene): Record<string, Point> {
   const positions: Record<string, Point> = {};
   const COLUMN_GAP = 56;
   const ROW_PITCH = 150;
-  const CHOICE_PITCH = 150;
-  const STEP_X = NODE_WIDTH + CHOICE_WIDTH + COLUMN_GAP * 2;
+  const STEP_X = NODE_WIDTH + COLUMN_GAP;
   const START_X = TREE_PADDING;
   const START_Y = TREE_PADDING;
 
-  // Rigid left-to-right grid:
-  //   node -> choice 1 -> destination
-  //        -> choice 2 -> destination
-  //        -> choice 3 -> destination
+  // Fixed semantic columns. Branches do NOT create additional horizontal
+  // depth. The important shape is:
   //
-  // Scene nodes own a fixed column and integer row. A choice is placed in
-  // the gap immediately to the right of its prompt, and its destination is
-  // placed on the exact same row. Nothing is positioned from node height, so
-  // rows never drift when text lengths differ.
+  //   Start -> Dialogue -> Prompt -> Choice -> Dialogue
+  //                                  |-> Choice -> Dialogue
+  //                                  |-> Choice -> Dialogue
+  //
+  // All choices from one prompt share one column, and all of their
+  // destinations share the next column. Downstream nodes continue from
+  // that destination column rather than pushing individual branches farther
+  // right.
 
-  const depth = new Map<number, number>();
-  const row = new Map<number, number>();
+  const column = new Map<number, number>();
+  const gridRow = new Map<number, number>();
 
-  if (scene.length) {
-    depth.set(0, 0);
-    row.set(0, 0);
-  }
+  if (!scene.length) return positions;
 
-  const queue = scene.length ? [0] : [];
+  column.set(0, 0);
+  gridRow.set(0, 0);
+
+  // First assign structural columns using graph traversal.
+  const queue = [0];
   while (queue.length) {
-    const current = queue.shift()!;
-    const node = scene[current];
-    const currentDepth = depth.get(current) ?? 0;
-    const currentRow = row.get(current) ?? 0;
+    const index = queue.shift()!;
+    const node = scene[index];
+    const currentColumn = column.get(index) ?? 0;
+    const currentRow = gridRow.get(index) ?? 0;
 
     if (isStartRouter(node)) {
       const next = node.start_index_if_flag.default;
-      if (scene[next] && !depth.has(next)) {
-        depth.set(next, currentDepth + 1);
-        row.set(next, currentRow);
+      if (scene[next] && !column.has(next)) {
+        column.set(next, currentColumn + 1);
+        gridRow.set(next, currentRow);
         queue.push(next);
       }
       continue;
@@ -126,56 +128,52 @@ function autoLayout(scene: Scene): Record<string, Point> {
     if (!isDialogueNode(node)) continue;
 
     if (node.choices?.length) {
-      const center = (node.choices.length - 1) / 2;
+      // Prompt -> Choice -> destination: exactly two visual columns.
       node.choices.forEach((choice, choiceIndex) => {
         if (choice.next === null || !scene[choice.next]) return;
 
         const target = choice.next;
-        const preferredRow = currentRow + (choiceIndex - center);
+        const targetColumn = currentColumn + 2;
+        const center = (node.choices!.length - 1) / 2;
+        const targetRow = currentRow + (choiceIndex - center);
 
-        if (!depth.has(target)) {
-          depth.set(target, currentDepth + 2);
-          row.set(target, preferredRow);
+        if (!column.has(target)) {
+          column.set(target, targetColumn);
+          gridRow.set(target, targetRow);
           queue.push(target);
-        } else {
-          // Keep an already-positioned destination stable. This prevents
-          // converging branches from making the graph wobble.
-          depth.set(target, Math.max(depth.get(target) ?? 0, currentDepth + 2));
         }
       });
-    } else if (node.next !== null && scene[node.next] && !depth.has(node.next)) {
-      depth.set(node.next, currentDepth + 1);
-      row.set(node.next, currentRow);
-      queue.push(node.next);
+    } else if (node.next !== null && scene[node.next]) {
+      if (!column.has(node.next)) {
+        column.set(node.next, currentColumn + 1);
+        gridRow.set(node.next, currentRow);
+        queue.push(node.next);
+      }
     }
   }
 
-  // Deterministic placement for disconnected nodes.
+  // Unconnected nodes: keep them in deterministic columns/rows.
+  let fallbackColumn = Math.max(...column.values(), 0) + 1;
   let fallbackRow = 0;
   scene.forEach((_, index) => {
-    if (depth.has(index)) return;
-    const usedRows = new Set([...row.values()].map((value) => Math.round(value)));
-    while (usedRows.has(fallbackRow)) fallbackRow += 1;
-    depth.set(index, Math.max(0, ...depth.values(), 0) + 1);
-    row.set(index, fallbackRow);
-    fallbackRow += 1;
+    if (column.has(index)) return;
+    column.set(index, fallbackColumn++);
+    gridRow.set(index, fallbackRow++);
   });
 
-  // Normalize rows to integers while preserving their relative order.
-  const uniqueRows = [...new Set([...row.values()].map((value) => Math.round(value)))].sort((a, b) => a - b);
-  const rowIndex = new Map(uniqueRows.map((value, index) => [value, index]));
+  // Normalize branch rows into a fixed integer grid.
+  const rows = [...new Set([...gridRow.values()].map((r) => Math.round(r)))].sort((a, b) => a - b);
+  const rowIndex = new Map(rows.map((r, i) => [r, i]));
 
-  scene.forEach((_, sceneIndex) => {
-    const column = depth.get(sceneIndex) ?? 0;
-    const normalizedRow = rowIndex.get(Math.round(row.get(sceneIndex) ?? 0)) ?? 0;
-    positions[sceneId(sceneIndex)] = {
-      x: START_X + column * STEP_X,
-      y: START_Y + normalizedRow * ROW_PITCH,
+  scene.forEach((_, index) => {
+    positions[sceneId(index)] = {
+      x: START_X + (column.get(index) ?? 0) * STEP_X,
+      y: START_Y + (rowIndex.get(Math.round(gridRow.get(index) ?? 0)) ?? 0) * ROW_PITCH,
     };
   });
 
-  // Choices sit directly to the right of their prompt. Their vertical
-  // position is derived only from the prompt's grid row and choice index.
+  // Choices occupy the fixed column immediately after the prompt.
+  // Every choice uses the same X and only its grid row changes.
   scene.forEach((node, sceneIndex) => {
     if (!isDialogueNode(node) || !node.choices?.length) return;
 
@@ -183,8 +181,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
     const center = (node.choices.length - 1) / 2;
 
     node.choices.forEach((choice, choiceIndex) => {
-      const branchOffset = (choiceIndex - center) * CHOICE_PITCH;
-      const choiceY = prompt.y + branchOffset;
+      const choiceY = prompt.y + (choiceIndex - center) * ROW_PITCH;
 
       positions[choiceId(sceneIndex, choiceIndex)] = {
         x: prompt.x + NODE_WIDTH + COLUMN_GAP,
@@ -192,19 +189,18 @@ function autoLayout(scene: Scene): Record<string, Point> {
       };
 
       if (choice.next !== null && scene[choice.next]) {
-        const destination = positions[sceneId(choice.next)];
-        if (destination) {
-          // Exact same Y as the choice. X remains determined by its grid column.
-          positions[sceneId(choice.next)] = {
-            x: destination.x,
-            y: choiceY,
-          };
+        const target = positions[sceneId(choice.next)];
+        if (target) {
+          // LOCK the destination to the same column for every branch.
+          target.x = prompt.x + STEP_X * 2;
+          target.y = choiceY;
+          positions[sceneId(choice.next)] = target;
         }
       }
     });
   });
 
-  // Keep ordinary dialogue chains perfectly horizontal.
+  // Ordinary dialogue -> dialogue remains a straight horizontal chain.
   scene.forEach((node, sceneIndex) => {
     if (!isDialogueNode(node) || node.choices?.length || node.next === null || !scene[node.next]) return;
 
@@ -212,7 +208,10 @@ function autoLayout(scene: Scene): Record<string, Point> {
     const target = positions[sceneId(node.next)];
     if (!source || !target) return;
 
-    positions[sceneId(node.next)] = { x: target.x, y: source.y };
+    positions[sceneId(node.next)] = {
+      x: Math.max(target.x, source.x + STEP_X),
+      y: source.y,
+    };
   });
 
   visuals(scene).forEach((visual, index) => {
@@ -317,7 +316,7 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
   const canvasRef = useRef<HTMLDivElement>(null);
   const layout = useMemo(() => autoLayout(scene), [scene]);
 
-  const display = useMemo(() => Object.fromEntries(visuals(scene).map((node) => [node.id, positions[node.id] ?? layout[node.id]])) as Record<string, Point>, [scene, positions, layout]);
+  const display = useMemo(() => Object.fromEntries(visuals(scene).map((node) => [node.id, layout[node.id]])) as Record<string, Point>, [scene, layout]);
 
   function point(e: React.PointerEvent) {
     const rect = canvasRef.current?.getBoundingClientRect();
