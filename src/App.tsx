@@ -111,7 +111,7 @@ function App() {
   }
 
   const selectedChapter = selectedScene ? chapters[selectedScene.chapterId] : null;
-  const selectedData = selectedChapter?.[selectedScene!.sceneName];
+  const selectedData = selectedScene && selectedChapter ? selectedChapter[selectedScene.sceneName] : null;
 
   return (
     <div className="editor-app">
