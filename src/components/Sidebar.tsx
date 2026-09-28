@@ -41,3 +41,5 @@ export default function Sidebar({ chapters, selectedChapterId, selectedScene, on
       </nav>
     </aside>
   );
+
+}
