@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import wordBank from "../data/word_bank.json";
 import type { Scene, IdlePool, DialogueNode as DialogueNodeType, Choice, StartRouter } from "../types/content";
 
 type SceneEditorProps = {
@@ -264,6 +265,114 @@ function autoLayout(scene: Scene): Record<string, Point> {
 
   return positions;
 }
+
+type WordBankEntry = {
+  id: string;
+  akeanon: string;
+  gloss: string;
+  area: string;
+};
+
+const WORD_BANK: WordBankEntry[] = wordBank.words;
+
+function WordIdPicker({
+  value,
+  onChange,
+}: {
+  value: string[];
+  onChange: (wordIds: string[]) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const selected = value ?? [];
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+
+  const matches = useMemo(() => {
+    if (!normalizedQuery) return WORD_BANK.slice(0, 12);
+    return WORD_BANK.filter((word) =>
+      [word.id, word.akeanon, word.gloss, word.area]
+        .some((field) => field.toLocaleLowerCase().includes(normalizedQuery))
+    ).slice(0, 20);
+  }, [normalizedQuery]);
+
+  const selectedEntries = useMemo(
+    () => selected.map((id) => WORD_BANK.find((word) => word.id === id)).filter(Boolean) as WordBankEntry[],
+    [selected],
+  );
+
+  function addWord(id: string) {
+    if (!selected.includes(id)) onChange([...selected, id]);
+    setQuery("");
+    setOpen(true);
+  }
+
+  function removeWord(id: string) {
+    onChange(selected.filter((wordId) => wordId !== id));
+  }
+
+  return (
+    <div className="word-id-picker">
+      <div className="word-id-picker-input-wrap">
+        <input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 120)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setOpen(false);
+            if (e.key === "Enter" && matches.length) {
+              e.preventDefault();
+              addWord(matches[0].id);
+            }
+          }}
+          placeholder="Search Akeanon word, ID, or gloss…"
+          aria-label="Search word bank"
+        />
+        {open && (
+          <div className="word-id-picker-menu">
+            {matches.length ? (
+              matches.map((word) => (
+                <button
+                  type="button"
+                  key={word.id}
+                  className={`word-id-picker-option ${selected.includes(word.id) ? "is-selected" : ""}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => addWord(word.id)}
+                >
+                  <span className="word-id-picker-word">{word.akeanon}</span>
+                  <span className="word-id-picker-meta">{word.id} · {word.gloss}</span>
+                </button>
+              ))
+            ) : (
+              <div className="word-id-picker-empty">No matching word IDs.</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {selectedEntries.length > 0 && (
+        <div className="word-id-picker-selected">
+          {selectedEntries.map((word) => (
+            <span className="word-id-chip" key={word.id}>
+              <span>{word.akeanon}</span>
+              <code>{word.id}</code>
+              <button type="button" aria-label={`Remove ${word.id}`} onClick={() => removeWord(word.id)}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {selected.some((id) => !WORD_BANK.some((word) => word.id === id)) && (
+        <small className="word-id-picker-warning">Some saved IDs are not in the current word bank.</small>
+      )}
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="scene-inspector-field"><span>{label}</span>{children}</label>;
 }
@@ -336,7 +445,7 @@ function SceneInspector({
         <Field label="Speaker"><input value={node.speaker} onChange={(e) => update("speaker", e.target.value)} placeholder="Speaker" /></Field>
         <Field label={node.choices?.length ? "User Prompt" : "Dialogue"}><textarea value={node.text} onChange={(e) => update("text", e.target.value)} rows={8} /></Field>
         <Field label="Translation"><textarea value={node.translation ?? ""} onChange={(e) => update("translation", e.target.value || undefined)} rows={5} /></Field>
-        <Field label="Word IDs"><textarea value={(node.word_ids ?? []).join("\n")} onChange={(e) => update("word_ids", e.target.value.split(/[,\n]/).map((id) => id.trim()).filter(Boolean))} rows={4} placeholder={"w128\nw129"} /><small>One ID per line or comma-separated.</small></Field>
+        <Field label="Word IDs"><WordIdPicker value={node.word_ids ?? []} onChange={(wordIds) => update("word_ids", wordIds)} /><small>Search the word bank by Akeanon word, ID, or English gloss.</small></Field>
         <Field label="Next"><select value={node.next ?? ""} onChange={(e) => update("next", e.target.value === "" ? null : Number(e.target.value))}><option value="">End</option>{scene.map((_, i) => <option key={i} value={i}>Node #{i} — {title(scene[i], i)}</option>)}</select></Field>
         <Field label="Set Flag on Enter"><input value={node.set_flag_on_enter ?? ""} onChange={(e) => update("set_flag_on_enter", e.target.value || undefined)} placeholder="optional flag" /></Field>
         <div className="scene-inspector-section"><div className="scene-inspector-section-title">Choices</div>{node.choices?.map((choice, i) => <button key={i} type="button" className="scene-inspector-choice" onClick={() => onSelectChoice(i)}><span>#{i + 1}</span>{choice.label || "Empty choice"}</button>)}<button type="button" onClick={() => onChange(selected.sceneIndex, { ...node, choices: [...(node.choices ?? []), { label: "New choice", next: null }] })}>+ Add Choice</button></div>
