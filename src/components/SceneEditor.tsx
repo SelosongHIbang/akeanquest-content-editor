@@ -41,12 +41,12 @@ type Edge = {
 
 const NODE_WIDTH = 340;
 const CHOICE_WIDTH = 300;
-const NODE_GAP_X = 90;
-const NODE_GAP_Y = 110;
+const NODE_GAP_X = 42;
+const DEFAULT_NODE_GAP_Y = 20;
 const HEADER_HEIGHT = 68;
 const DIALOGUE_BODY_HEIGHT = 150;
 const CHOICE_HEIGHT = 74;
-const CHOICE_NODE_HEIGHT = 82;
+const CHOICE_NODE_BASE_HEIGHT = 108;
 const TREE_PADDING_X = 80;
 const TREE_PADDING_Y = 60;
 
@@ -60,6 +60,10 @@ function isStartRouter(node: Scene[number]): node is StartRouter {
 
 function isDialogueNode(node: Scene[number]): node is DialogueNodeType {
   return typeof node === "object" && node !== null && "speaker" in node && "text" in node && "next" in node;
+}
+
+function wrappedLineCount(text: string, charsPerLine: number) {
+  return Math.max(1, text.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charsPerLine)), 0));
 }
 
 function nodeTitle(node: Scene[number], index: number) {
@@ -76,12 +80,18 @@ function nodeKind(node: Scene[number]) {
 }
 
 function nodeHeight(node: Scene[number], expanded: boolean) {
-  if (!expanded) return 82;
-  if (isStartRouter(node)) return 150;
+  if (isStartRouter(node)) return expanded ? 150 : 82;
   if (!isDialogueNode(node)) return 120;
+
+  const textLines = wrappedLineCount(node.text || "", expanded ? 48 : 42);
+  if (!expanded) {
+    return HEADER_HEIGHT + 18 + Math.max(1, textLines) * 18 + 14;
+  }
+
+  const textAreaLines = Math.max(3, textLines);
   return node.choices?.length
-    ? HEADER_HEIGHT + Math.max(1, node.choices.length) * CHOICE_HEIGHT + 130
-    : HEADER_HEIGHT + DIALOGUE_BODY_HEIGHT;
+    ? HEADER_HEIGHT + Math.max(1, node.choices.length) * 24 + 150 + Math.max(0, textAreaLines - 3) * 18
+    : HEADER_HEIGHT + 170 + Math.max(0, textAreaLines - 3) * 18;
 }
 
 function choiceVisualId(sceneIndex: number, choiceIndex: number) {
@@ -90,6 +100,11 @@ function choiceVisualId(sceneIndex: number, choiceIndex: number) {
 
 function sceneVisualId(sceneIndex: number) {
   return `scene-${sceneIndex}`;
+}
+
+function choiceNodeHeight(choice: ChoiceVisual) {
+  const lines = Math.max(2, Math.ceil(Math.max(1, choice.label.length) / 38));
+  return CHOICE_NODE_BASE_HEIGHT + (lines - 2) * 18;
 }
 
 function getVisualNodes(sceneData: Scene): VisualNode[] {
@@ -158,6 +173,7 @@ function getEdges(sceneData: Scene): Edge[] {
 function autoTreePositions(
   sceneData: Scene,
   expanded: Set<number>,
+  nodeGapY: number,
 ): Record<string, Point> {
   const visualNodes = getVisualNodes(sceneData);
   const edges = getEdges(sceneData);
@@ -231,6 +247,14 @@ function autoTreePositions(
     });
 
     let cursor = TREE_PADDING_X;
+    const rowHeight = Math.max(
+      ...nodes.map((node) =>
+        node.kind === "choice"
+          ? choiceNodeHeight(node)
+          : nodeHeight(sceneData[node.sceneIndex], expanded.has(node.sceneIndex)),
+      ),
+    );
+
     nodes.forEach((node) => {
       const width = node.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
       const parents = parentIds.get(node.id) ?? [];
@@ -238,9 +262,27 @@ function autoTreePositions(
         ? parents.reduce((sum, parentId) => sum + (positions[parentId]?.x ?? cursor), 0) / parents.length
         : cursor;
       const x = Math.max(cursor, preferred - width / 2);
-      positions[node.id] = { x, y: TREE_PADDING_Y + nodeLevel * (170 + NODE_GAP_Y) };
+      positions[node.id] = { x, y: 0 };
       cursor = x + width + NODE_GAP_X;
       occupied.set(nodeLevel, cursor);
+    });
+
+    const rowY = TREE_PADDING_Y + levelsSorted
+      .slice(0, levelsSorted.indexOf(nodeLevel))
+      .reduce((sum, level) => {
+        const levelNodes = levels.get(level) ?? [];
+        const levelHeight = Math.max(
+          ...levelNodes.map((item) =>
+            item.kind === "choice"
+              ? choiceNodeHeight(item)
+              : nodeHeight(sceneData[item.sceneIndex], expanded.has(item.sceneIndex)),
+          ),
+        );
+        return sum + levelHeight + nodeGapY;
+      }, 0);
+
+    nodes.forEach((node) => {
+      positions[node.id].y = rowY;
     });
   });
 
@@ -277,7 +319,8 @@ function SceneMap({
   onDuplicate,
   onDelete,
 }: SceneMapProps) {
-  const initialLayout = useMemo(() => autoTreePositions(sceneData, expanded), [sceneData, expanded]);
+  const [nodeGapY, setNodeGapY] = useState(DEFAULT_NODE_GAP_Y);
+  const initialLayout = useMemo(() => autoTreePositions(sceneData, expanded, nodeGapY), [sceneData, expanded, nodeGapY]);
   const [positions, setPositions] = useState<Record<string, Point>>(initialLayout);
   const [scale, setScale] = useState(0.9);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
@@ -289,11 +332,11 @@ function SceneMap({
   const edges = useMemo(() => getEdges(sceneData), [sceneData]);
   const visualById = useMemo(() => new Map(visualNodes.map((node) => [node.id, node])), [visualNodes]);
   const displayPositions = useMemo(() => {
-    const fallback = autoTreePositions(sceneData, expanded);
+    const fallback = autoTreePositions(sceneData, expanded, nodeGapY);
     return Object.fromEntries(
       visualNodes.map((node) => [node.id, positions[node.id] ?? fallback[node.id] ?? { x: TREE_PADDING_X, y: TREE_PADDING_Y }]),
     ) as Record<string, Point>;
-  }, [sceneData, expanded, positions, visualNodes]);
+  }, [sceneData, expanded, positions, visualNodes, nodeGapY]);
 
   function canvasPoint(event: React.PointerEvent) {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -345,6 +388,7 @@ function SceneMap({
     if ((event.target as HTMLElement).closest("[data-node]")) return;
     const point = canvasPoint(event);
     setPanning({ start: point, origin: offset });
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
 
   function zoom(delta: number) {
@@ -393,6 +437,14 @@ function SceneMap({
     });
   }
 
+  function handleToggle(index: number) {
+    const next = new Set(expanded);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    setPositions(autoTreePositions(sceneData, next, nodeGapY));
+    onToggle(index);
+  }
+
   function renderSceneNode(node: Scene[number], index: number) {
     const isExpanded = expanded.has(index);
     const kind = nodeKind(node);
@@ -405,7 +457,7 @@ function SceneMap({
               <span className="scene-map-node-type">START</span>
               <strong>Scene Start</strong>
             </div>
-            <button type="button" onClick={() => onToggle(index)} className="scene-map-expand">
+            <button type="button" onClick={() => handleToggle(index)} className="scene-map-expand">
               {isExpanded ? "⌃" : "⌄"}
             </button>
           </div>
@@ -453,7 +505,7 @@ function SceneMap({
           </div>
           <button
             type="button"
-            onClick={() => onToggle(index)}
+            onClick={() => handleToggle(index)}
             className="scene-map-expand"
             data-no-drag
             aria-label={isExpanded ? "Collapse node" : "Expand node"}
@@ -484,7 +536,7 @@ function SceneMap({
               <textarea
                 value={node.text}
                 onChange={(event) => updateDialogueField(index, "text", event.target.value)}
-                rows={2}
+                rows={Math.max(3, wrappedLineCount(node.text || "", 48))}
                 placeholder={choices.length ? "What should the player be asked?" : "Enter dialogue..."}
               />
             </label>
@@ -555,11 +607,12 @@ function SceneMap({
           <span className="scene-map-node-type">CHOICE</span>
           <span className="scene-map-choice-index">#{choice.choiceIndex + 1}</span>
         </div>
-        <input
+        <textarea
           data-no-drag
           value={choice.label}
           onChange={(event) => updateChoice(choice.sceneIndex, choice.choiceIndex, { label: event.target.value })}
           placeholder={`Choice ${choice.choiceIndex + 1}`}
+          rows={Math.max(2, Math.ceil(Math.max(1, choice.label.length) / 38))}
         />
         <div className="scene-map-choice-destination">
           <span>GOES TO</span>
@@ -596,6 +649,23 @@ function SceneMap({
       <div className="scene-map-toolbar">
         <span>Tree layout • Drag nodes • Expand to edit • Drag empty space to pan • Scroll to zoom</span>
         <div className="scene-map-actions">
+          <label className="scene-map-gap-control">
+            <span>Gap</span>
+            <input
+              type="range"
+              min="8"
+              max="64"
+              step="2"
+              value={nodeGapY}
+              onChange={(event) => {
+                const value = Number(event.target.value);
+                setNodeGapY(value);
+                setPositions(autoTreePositions(sceneData, expanded, value));
+              }}
+              aria-label="Vertical node gap"
+            />
+            <output>{nodeGapY}px</output>
+          </label>
           <button type="button" onClick={() => zoom(0.1)}>+</button>
           <span>{Math.round(scale * 100)}%</span>
           <button type="button" onClick={() => zoom(-0.1)}>−</button>
@@ -604,7 +674,7 @@ function SceneMap({
             onClick={() => {
               setScale(0.9);
               setOffset({ x: 0, y: 0 });
-              setPositions(autoTreePositions(sceneData, expanded));
+              setPositions(autoTreePositions(sceneData, expanded, nodeGapY));
             }}
           >
             Arrange Tree
@@ -626,12 +696,6 @@ function SceneMap({
       >
         <div className="scene-map-world" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
           <svg className="scene-map-edges" width="3200" height="2200" aria-hidden="true">
-            <defs>
-              <marker id="scene-map-arrow-down" markerWidth="8" markerHeight="8" refX="4" refY="7" orient="auto">
-                <path d="M0,0 L8,0 L4,7 z" fill="currentColor" />
-              </marker>
-            </defs>
-
             {edges.map((edge, edgeIndex) => {
               const fromNode = visualById.get(edge.from);
               const toNode = visualById.get(edge.to);
@@ -642,26 +706,22 @@ function SceneMap({
               if (!from || !to) return null;
 
               const fromHeight = fromNode.kind === "choice"
-                ? CHOICE_NODE_HEIGHT
+                ? choiceNodeHeight(fromNode)
                 : nodeHeight(sceneData[fromNode.sceneIndex], expanded.has(fromNode.sceneIndex));
               const toWidth = toNode.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
 
               // Every connection leaves the bottom-center of its source and enters the top-center of its target.
               const x1 = from.x + (fromNode.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH) / 2;
-              const y1 = from.y + fromHeight + 8;
+              const y1 = from.y + fromHeight + 16;
               const x2 = to.x + toWidth / 2;
-              const y2 = to.y - 8;
+              const y2 = to.y - 16;
               const bend = Math.max(45, Math.abs(y2 - y1) * 0.42);
 
               return (
                 <g key={`${edge.from}-${edge.to}-${edgeIndex}`} className={`scene-map-edge ${edge.choice ? "is-choice" : ""}`}>
                   <path
                     d={`M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`}
-                    markerEnd="url(#scene-map-arrow-down)"
                   />
-                  {edge.label && (
-                    <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 6}>{edge.label}</text>
-                  )}
                 </g>
               );
             })}
@@ -679,7 +739,7 @@ function SceneMap({
                   top: position.y,
                   width,
                   minHeight: visual.kind === "choice"
-                    ? CHOICE_NODE_HEIGHT
+                    ? choiceNodeHeight(visual)
                     : nodeHeight(sceneData[visual.sceneIndex], expanded.has(visual.sceneIndex)),
                 }}
               >

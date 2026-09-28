@@ -44,9 +44,11 @@
   overflow: hidden;
   cursor: grab;
   position: relative;
+  user-select: none;
   background-image: radial-gradient(rgb(39 39 42) 1px, transparent 1px);
   background-size: 24px 24px;
   touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .scene-map:active {
@@ -73,15 +75,6 @@
   stroke: currentColor;
   stroke-width: 2;
   opacity: .72;
-}
-
-.scene-map-edge text {
-  fill: rgb(161 161 170);
-  font-size: 12px;
-  text-anchor: middle;
-  paint-order: stroke;
-  stroke: rgb(9 9 11);
-  stroke-width: 4px;
 }
 
 .scene-map-node {
@@ -140,12 +133,12 @@
 }
 
 .scene-map-node-heading strong {
-  overflow: hidden;
+  overflow: visible;
   padding-right: 4px;
   font-size: 14px;
   line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .scene-map-node-number {
@@ -179,9 +172,9 @@
 }
 
 .scene-map-node-collapsed span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .scene-map-node-collapsed em {
@@ -232,6 +225,8 @@
 .scene-map-node textarea {
   resize: vertical;
   min-height: 48px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .scene-map-node input:focus,
@@ -351,6 +346,32 @@
   font-size: 11px;
 }
 
+.scene-map-gap-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgb(161 161 170);
+  white-space: nowrap;
+}
+
+.scene-map-gap-control span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.scene-map-gap-control input {
+  width: 90px;
+  accent-color: rgb(161 161 170);
+}
+
+.scene-map-gap-control output {
+  min-width: 34px;
+  color: rgb(212 212 216);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (max-width: 700px) {
   .scene-map-toolbar {
     align-items: flex-start;
@@ -379,10 +400,6 @@
 .scene-map-edge.is-choice path {
   stroke: rgb(251 191 36);
   opacity: .9;
-}
-
-.scene-map-edge text {
-  font-size: 11px;
 }
 
 .scene-map-choice-node {
@@ -421,6 +438,7 @@
 }
 
 .scene-map-choice-node input,
+.scene-map-choice-node textarea,
 .scene-map-choice-node select {
   width: 100%;
   box-sizing: border-box;
@@ -434,7 +452,16 @@
   outline: none;
 }
 
+.scene-map-choice-node textarea {
+  width: 100%;
+  min-height: 42px;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
 .scene-map-choice-node input:focus,
+.scene-map-choice-node textarea:focus,
 .scene-map-choice-node select:focus {
   border-color: rgb(251 191 36);
 }
