@@ -14,12 +14,33 @@ function App() {
     const saved = localStorage.getItem("akeanquest-content-draft");
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as Chapter;
+        const parsed = JSON.parse(saved) as any;
+        // Migrate the old editor draft shape:
+        // { chapters: { ...scenes }, activeChapterId: "..." }
+        // back to the Chapter shape used by the current scene editor.
+        if (
+          parsed &&
+          typeof parsed === "object" &&
+          parsed.chapters &&
+          typeof parsed.chapters === "object" &&
+          !Array.isArray(parsed.chapters)
+        ) {
+          const active = parsed.activeChapterId;
+          const chapter = active && parsed.chapters[active];
+          if (chapter && typeof chapter === "object") return chapter as Chapter;
+          const first = Object.values(parsed.chapters)[0];
+          if (first && typeof first === "object") return first as Chapter;
+        }
+
         // Never let an empty/corrupt local draft replace the bundled scene tree.
-        // This keeps the node graph recoverable after an interrupted edit or
-        // stale localStorage state.
         if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
-          return parsed;
+          const looksLikeChapter = Object.values(parsed).some(
+            (value: any) => Array.isArray(value) || (
+              value && typeof value === "object" &&
+              ("low" in value || "med" in value || "high" in value)
+            )
+          );
+          if (looksLikeChapter) return parsed as Chapter;
         }
       } catch {}
       localStorage.removeItem("akeanquest-content-draft");
