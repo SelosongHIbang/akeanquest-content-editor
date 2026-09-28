@@ -14,6 +14,12 @@ type WordBank = { words: WordEntry[] };
 type Chapters = Record<string, Chapter>;
 type SelectedScene = { chapterId: string; sceneName: string } | null;
 
+type UnknownRecord = Record<string, unknown>;
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null;
+}
+
 import Sidebar from "./components/Sidebar";
 import SceneEditor from "./components/SceneEditor";
 
@@ -31,21 +37,21 @@ function App() {
     const saved = localStorage.getItem("akeanquest-content-draft");
     if (saved) {
       try {
-        const parsed = JSON.parse(saved) as any;
-        if (parsed && typeof parsed === "object" && parsed.chapters && typeof parsed.chapters === "object") {
+        const parsed: unknown = JSON.parse(saved);
+        if (isRecord(parsed) && isRecord(parsed.chapters)) {
           return { ...bundledChapters, ...parsed.chapters } as Chapters;
         }
-        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+        if (isRecord(parsed) && Object.keys(parsed).length > 0) {
           const looksLikeChapter = Object.values(parsed).some(
-            (value: any) => Array.isArray(value) || (
-              value && typeof value === "object" &&
-              ("low" in value || "med" in value || "high" in value)
+            (value: unknown) => Array.isArray(value) || (
+              isRecord(value) && ("low" in value || "med" in value || "high" in value)
             )
           );
           if (looksLikeChapter) return { ...bundledChapters, chapter1: parsed as Chapter };
         }
-      } catch {}
-      localStorage.removeItem("akeanquest-content-draft");
+      } catch {
+        localStorage.removeItem("akeanquest-content-draft");
+      }
     }
     return bundledChapters;
   });
@@ -94,7 +100,9 @@ function App() {
     const currentChapter = chapters[selectedScene.chapterId];
     if (!currentChapter[selectedScene.sceneName]) return;
     if (!confirm(`Archive "${selectedScene.sceneName}"?`)) return;
-    const { [selectedScene.sceneName]: _archived, ...remaining } = currentChapter;
+    const remaining = Object.fromEntries(
+      Object.entries(currentChapter).filter(([name]) => name !== selectedScene.sceneName)
+    ) as Chapter;
     setChapters({
       ...chapters,
       [selectedScene.chapterId]: remaining,
