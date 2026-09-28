@@ -1,38 +1,40 @@
 import { useEffect, useState } from "react";
 import chapter1 from "./data/chapter1.json";
+import chapter2 from "./data/chapter2.json";
+import chapter3 from "./data/chapter3.json";
+import chapter4 from "./data/chapter4.json";
+import chapter5 from "./data/chapter5.json";
+import chapter6 from "./data/chapter6.json";
 import wordBankData from "./data/word_bank.json";
 import WordBankEditor from "./components/WordBankEditor";
 import type { Chapter, Scene } from "./types/content";
 
 type WordEntry = typeof wordBankData.words[number];
 type WordBank = { words: WordEntry[] };
+type Chapters = Record<string, Chapter>;
+type SelectedScene = { chapterId: string; sceneName: string } | null;
+
 import Sidebar from "./components/Sidebar";
 import SceneEditor from "./components/SceneEditor";
 
+const bundledChapters: Chapters = {
+  chapter1: chapter1 as Chapter,
+  chapter2: chapter2 as Chapter,
+  chapter3: chapter3 as Chapter,
+  chapter4: chapter4 as Chapter,
+  chapter5: chapter5 as Chapter,
+  chapter6: chapter6 as Chapter,
+};
+
 function App() {
-  const [content, setContent] = useState<Chapter>(() => {
+  const [chapters, setChapters] = useState<Chapters>(() => {
     const saved = localStorage.getItem("akeanquest-content-draft");
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as any;
-        // Migrate the old editor draft shape:
-        // { chapters: { ...scenes }, activeChapterId: "..." }
-        // back to the Chapter shape used by the current scene editor.
-        if (
-          parsed &&
-          typeof parsed === "object" &&
-          parsed.chapters &&
-          typeof parsed.chapters === "object" &&
-          !Array.isArray(parsed.chapters)
-        ) {
-          const active = parsed.activeChapterId;
-          const chapter = active && parsed.chapters[active];
-          if (chapter && typeof chapter === "object") return chapter as Chapter;
-          const first = Object.values(parsed.chapters)[0];
-          if (first && typeof first === "object") return first as Chapter;
+        if (parsed && typeof parsed === "object" && parsed.chapters && typeof parsed.chapters === "object") {
+          return { ...bundledChapters, ...parsed.chapters } as Chapters;
         }
-
-        // Never let an empty/corrupt local draft replace the bundled scene tree.
         if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
           const looksLikeChapter = Object.values(parsed).some(
             (value: any) => Array.isArray(value) || (
@@ -40,45 +42,53 @@ function App() {
               ("low" in value || "med" in value || "high" in value)
             )
           );
-          if (looksLikeChapter) return parsed as Chapter;
+          if (looksLikeChapter) return { ...bundledChapters, chapter1: parsed as Chapter };
         }
       } catch {}
       localStorage.removeItem("akeanquest-content-draft");
     }
-    return chapter1 as Chapter;
+    return bundledChapters;
   });
-  const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [selectedScene, setSelectedScene] = useState<SelectedScene>(null);
   const [activeTab, setActiveTab] = useState<"scenes" | "word-bank">("scenes");
   const [wordBank, setWordBank] = useState<WordBank>(() => {
     const saved = localStorage.getItem("akeanquest-word-bank-draft");
     if (saved) { try { return JSON.parse(saved) as WordBank; } catch { localStorage.removeItem("akeanquest-word-bank-draft"); } }
     return wordBankData as WordBank;
   });
+
   useEffect(() => { localStorage.setItem("akeanquest-word-bank-draft", JSON.stringify(wordBank)); }, [wordBank]);
-
-  useEffect(() => { localStorage.setItem("akeanquest-content-draft", JSON.stringify(content)); }, [content]);
-
-  const items = Object.keys(content);
+  useEffect(() => { localStorage.setItem("akeanquest-content-draft", JSON.stringify({ chapters })); }, [chapters]);
 
   function handleSave() {
-    localStorage.setItem("akeanquest-content-draft", JSON.stringify(content));
+    if (!selectedScene) return;
+    const content = chapters[selectedScene.chapterId];
+    localStorage.setItem("akeanquest-content-draft", JSON.stringify({ chapters }));
     const blob = new Blob([JSON.stringify(content, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url; link.download = "chapter1.json"; link.click(); URL.revokeObjectURL(url);
+    link.href = url; link.download = selectedScene.chapterId + ".json"; link.click(); URL.revokeObjectURL(url);
   }
 
   function handleAddScene() {
+    if (!selectedScene) return;
     const sceneName = prompt("Enter scene name:");
     if (!sceneName) return;
-    if (content[sceneName]) { alert("A scene with that name already exists."); return; }
+    const currentChapter = chapters[selectedScene.chapterId];
+    if (currentChapter[sceneName]) { alert("A scene with that name already exists."); return; }
     const newScene: Scene = [
       { type: "start_router", start_index_if_flag: { default: 1 } },
       { speaker: "", text: "", next: null, word_ids: [] },
     ];
-    setContent({ ...content, [sceneName]: newScene });
-    setSelectedItem(sceneName);
+    setChapters({
+      ...chapters,
+      [selectedScene.chapterId]: { ...currentChapter, [sceneName]: newScene },
+    });
+    setSelectedScene({ chapterId: selectedScene.chapterId, sceneName });
   }
+
+  const selectedChapter = selectedScene ? chapters[selectedScene.chapterId] : null;
+  const selectedData = selectedChapter?.[selectedScene!.sceneName];
 
   return (
     <div className="editor-app">
@@ -88,7 +98,7 @@ function App() {
       </header>
 
       <div className="editor-workspace">
-        {activeTab === "scenes" ? (<><Sidebar items={items} selectedItem={selectedItem} onSelect={setSelectedItem} /><main className="editor-main">{selectedItem ? <SceneEditor key={selectedItem} name={selectedItem} data={content[selectedItem]} onChange={(updatedData) => setContent({ ...content, [selectedItem]: updatedData })} onAddScene={handleAddScene} onSave={handleSave} /> : <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>}</main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
+        {activeTab === "scenes" ? (<><Sidebar chapters={chapters} selectedScene={selectedScene} onSelect={setSelectedScene} /><main className="editor-main">{selectedScene && selectedData ? <SceneEditor key={selectedScene.chapterId + ":" + selectedScene.sceneName} name={selectedScene.sceneName} data={selectedData} onChange={(updatedData) => setChapters({ ...chapters, [selectedScene.chapterId]: { ...chapters[selectedScene.chapterId], [selectedScene.sceneName]: updatedData } })} onAddScene={handleAddScene} onSave={handleSave} /> : <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>}</main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
       </div>
     </div>
   );
