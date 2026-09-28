@@ -40,6 +40,7 @@ type Edge = {
 };
 
 const NODE_WIDTH = 340;
+const EXPANDED_NODE_WIDTH = 520;
 const CHOICE_WIDTH = 300;
 const NODE_GAP_X = 42;
 const DEFAULT_NODE_GAP_Y = 20;
@@ -79,19 +80,25 @@ function nodeKind(node: Scene[number]) {
   return "dialogue";
 }
 
+function nodeWidth(node: Scene[number], expanded: boolean) {
+  if (isStartRouter(node)) return NODE_WIDTH;
+  return expanded ? EXPANDED_NODE_WIDTH : NODE_WIDTH;
+}
+
 function nodeHeight(node: Scene[number], expanded: boolean) {
   if (isStartRouter(node)) return expanded ? 150 : 82;
   if (!isDialogueNode(node)) return 120;
 
-  const textLines = wrappedLineCount(node.text || "", expanded ? 48 : 42);
+  const textLines = wrappedLineCount(node.text || "", expanded ? 68 : 42);
   if (!expanded) {
     return HEADER_HEIGHT + 18 + Math.max(1, textLines) * 18 + 14;
   }
 
   const textAreaLines = Math.max(3, textLines);
-  return node.choices?.length
-    ? HEADER_HEIGHT + Math.max(1, node.choices.length) * 24 + 150 + Math.max(0, textAreaLines - 3) * 18
-    : HEADER_HEIGHT + 170 + Math.max(0, textAreaLines - 3) * 18;
+  const editorBaseHeight = node.choices?.length
+    ? 330 + Math.max(0, node.choices.length - 1) * 8
+    : 300;
+  return editorBaseHeight + Math.max(0, textAreaLines - 4) * 18;
 }
 
 function choiceVisualId(sceneIndex: number, choiceIndex: number) {
@@ -256,7 +263,7 @@ function autoTreePositions(
     );
 
     nodes.forEach((node) => {
-      const width = node.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+      const width = node.kind === "choice" ? CHOICE_WIDTH : nodeWidth(sceneData[node.sceneIndex], expanded.has(node.sceneIndex));
       const parents = parentIds.get(node.id) ?? [];
       const preferred = parents.length
         ? parents.reduce((sum, parentId) => sum + (positions[parentId]?.x ?? cursor), 0) / parents.length
@@ -291,7 +298,12 @@ function autoTreePositions(
     const rootChildren = children.get(rootId) ?? [];
     const childXs = rootChildren.map((id) => positions[id]?.x).filter((x): x is number => x !== undefined);
     if (childXs.length) {
-      const rootWidth = byId.get(rootId)?.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+      const rootVisual = byId.get(rootId);
+      const rootWidth = rootVisual?.kind === "choice"
+        ? CHOICE_WIDTH
+        : rootVisual?.kind === "scene"
+          ? nodeWidth(sceneData[rootVisual.sceneIndex], expanded.has(rootVisual.sceneIndex))
+          : NODE_WIDTH;
       const center = (Math.min(...childXs) + Math.max(...childXs)) / 2;
       positions[rootId].x = Math.max(TREE_PADDING_X, center - rootWidth / 2);
     }
@@ -332,8 +344,8 @@ function SceneMap({
   // changed node height cannot overlap the level below it. Manual dragging
   // is preserved while editing; the reflow is only tied to expansion state.
   useEffect(() => {
-    setPositions(autoTreePositions(sceneData, expanded));
-  }, [expanded]);
+    setPositions(autoTreePositions(sceneData, expanded, nodeGapY));
+  }, [expanded, nodeGapY]);
 
 
   const visualNodes = useMemo(() => getVisualNodes(sceneData), [sceneData]);
@@ -544,7 +556,7 @@ function SceneMap({
               <textarea
                 value={node.text}
                 onChange={(event) => updateDialogueField(index, "text", event.target.value)}
-                rows={Math.max(3, wrappedLineCount(node.text || "", 48))}
+                rows={Math.max(3, wrappedLineCount(node.text || "", 68))}
                 placeholder={choices.length ? "What should the player be asked?" : "Enter dialogue..."}
               />
             </label>
@@ -735,10 +747,15 @@ function SceneMap({
               const fromHeight = fromNode.kind === "choice"
                 ? choiceNodeHeight(fromNode)
                 : nodeHeight(sceneData[fromNode.sceneIndex], expanded.has(fromNode.sceneIndex));
-              const toWidth = toNode.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+              const toWidth = toNode.kind === "choice"
+                ? CHOICE_WIDTH
+                : nodeWidth(sceneData[toNode.sceneIndex], expanded.has(toNode.sceneIndex));
 
               // Every connection leaves the bottom-center of its source and enters the top-center of its target.
-              const x1 = from.x + (fromNode.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH) / 2;
+              const fromWidth = fromNode.kind === "choice"
+                ? CHOICE_WIDTH
+                : nodeWidth(sceneData[fromNode.sceneIndex], expanded.has(fromNode.sceneIndex));
+              const x1 = from.x + fromWidth / 2;
               const y1 = from.y + fromHeight + 16;
               const x2 = to.x + toWidth / 2;
               const y2 = to.y - 16;
@@ -756,7 +773,9 @@ function SceneMap({
 
           {visualNodes.map((visual) => {
             const position = displayPositions[visual.id];
-            const width = visual.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+            const width = visual.kind === "choice"
+              ? CHOICE_WIDTH
+              : nodeWidth(sceneData[visual.sceneIndex], expanded.has(visual.sceneIndex));
             return (
               <div
                 key={visual.id}
