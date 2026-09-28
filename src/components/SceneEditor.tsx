@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { Scene, IdlePool, DialogueNode as DialogueNodeType, Choice, StartRouter } from "../types/content";
 
 type SceneEditorProps = {
@@ -139,7 +140,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
   return positions;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="scene-inspector-field"><span>{label}</span>{children}</label>;
 }
 
@@ -150,6 +151,7 @@ function SceneInspector({
   onAdd,
   onDuplicate,
   onDelete,
+  onSelectChoice,
 }: {
   scene: Scene;
   selected: SelectedNode | null;
@@ -157,6 +159,7 @@ function SceneInspector({
   onAdd: (index: number) => void;
   onDuplicate: (index: number) => void;
   onDelete: (index: number) => void;
+  onSelectChoice: (choiceIndex: number) => void;
 }) {
   if (!selected) return <aside className="scene-inspector"><div className="scene-inspector-empty"><strong>No node selected</strong><span>Select a node in the graph to edit its data.</span></div></aside>;
 
@@ -212,7 +215,7 @@ function SceneInspector({
         <Field label="Word IDs"><textarea value={(node.word_ids ?? []).join("\n")} onChange={(e) => update("word_ids", e.target.value.split(/[,\n]/).map((id) => id.trim()).filter(Boolean))} rows={4} placeholder={"w128\nw129"} /><small>One ID per line or comma-separated.</small></Field>
         <Field label="Next"><select value={node.next ?? ""} onChange={(e) => update("next", e.target.value === "" ? null : Number(e.target.value))}><option value="">End</option>{scene.map((_, i) => <option key={i} value={i}>Node #{i} — {title(scene[i], i)}</option>)}</select></Field>
         <Field label="Set Flag on Enter"><input value={node.set_flag_on_enter ?? ""} onChange={(e) => update("set_flag_on_enter", e.target.value || undefined)} placeholder="optional flag" /></Field>
-        <div className="scene-inspector-section"><div className="scene-inspector-section-title">Choices</div>{node.choices?.map((choice, i) => <button key={i} type="button" className="scene-inspector-choice" onClick={() => {}}><span>#{i + 1}</span>{choice.label || "Empty choice"}</button>)}<button type="button" onClick={() => onChange(selected.sceneIndex, { ...node, choices: [...(node.choices ?? []), { label: "New choice", next: null }] })}>+ Add Choice</button></div>
+        <div className="scene-inspector-section"><div className="scene-inspector-section-title">Choices</div>{node.choices?.map((choice, i) => <button key={i} type="button" className="scene-inspector-choice" onClick={() => onSelectChoice(i)}><span>#{i + 1}</span>{choice.label || "Empty choice"}</button>)}<button type="button" onClick={() => onChange(selected.sceneIndex, { ...node, choices: [...(node.choices ?? []), { label: "New choice", next: null }] })}>+ Add Choice</button></div>
         <div className="scene-inspector-actions"><button type="button" onClick={() => onAdd(selected.sceneIndex)}>+ Add Node</button><button type="button" onClick={() => onDuplicate(selected.sceneIndex)}>Duplicate</button><button type="button" className="danger" onClick={() => onDelete(selected.sceneIndex)}>Delete</button></div>
       </div>
     </aside>
@@ -340,7 +343,7 @@ export default function SceneEditor({ name, data, onChange }: SceneEditorProps) 
       <div className="scene-editor-titlebar"><div><strong>{name}</strong><span>{data.length} nodes</span></div></div>
       <div className="scene-editor-body">
         <SceneMap scene={data} selected={selected} onSelect={setSelected} />
-        <SceneInspector scene={data} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} />
+        <SceneInspector scene={data} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} />
       </div>
     </div>
   );
