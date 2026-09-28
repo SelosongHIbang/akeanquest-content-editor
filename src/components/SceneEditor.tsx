@@ -1,11 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  Scene,
-  IdlePool,
-  DialogueNode as DialogueNodeType,
-  Choice,
-  StartRouter,
-} from "../types/content";
+import { useMemo, useRef, useState } from "react";
+import type { Scene, IdlePool, DialogueNode as DialogueNodeType, Choice, StartRouter } from "../types/content";
 
 type SceneEditorProps = {
   name: string;
@@ -14,785 +8,283 @@ type SceneEditorProps = {
 };
 
 type Point = { x: number; y: number };
+type SelectedNode = { kind: "scene"; sceneIndex: number } | { kind: "choice"; sceneIndex: number; choiceIndex: number };
 
-type ChoiceVisual = {
-  id: string;
-  kind: "choice";
-  sceneIndex: number;
-  choiceIndex: number;
-  label: string;
-  next: number | null;
-};
+const NODE_WIDTH = 250;
+const CHOICE_WIDTH = 220;
+const NODE_GAP_X = 56;
+const NODE_GAP_Y = 48;
+const TREE_PADDING = 60;
 
-type SceneVisual = {
-  id: string;
-  kind: "scene";
-  sceneIndex: number;
-};
-
-type VisualNode = ChoiceVisual | SceneVisual;
-
-type Edge = {
-  from: string;
-  to: string;
-  label?: string;
-  choice?: boolean;
-};
-
-const NODE_WIDTH = 340;
-const EXPANDED_NODE_WIDTH = 520;
-const CHOICE_WIDTH = 300;
-const NODE_GAP_X = 42;
-const DEFAULT_NODE_GAP_Y = 20;
-const HEADER_HEIGHT = 68;
-const DIALOGUE_BODY_HEIGHT = 150;
-const CHOICE_HEIGHT = 74;
-const CHOICE_NODE_BASE_HEIGHT = 108;
-const TREE_PADDING_X = 80;
-const TREE_PADDING_Y = 60;
-
-function isScene(data: Scene | IdlePool): data is Scene {
-  return Array.isArray(data);
-}
-
+function isScene(data: Scene | IdlePool): data is Scene { return Array.isArray(data); }
 function isStartRouter(node: Scene[number]): node is StartRouter {
   return typeof node === "object" && node !== null && "type" in node && node.type === "start_router";
 }
-
 function isDialogueNode(node: Scene[number]): node is DialogueNodeType {
   return typeof node === "object" && node !== null && "speaker" in node && "text" in node && "next" in node;
 }
-
-function wrappedLineCount(text: string, charsPerLine: number) {
-  return Math.max(1, text.split("\n").reduce((total, line) => total + Math.max(1, Math.ceil(line.length / charsPerLine)), 0));
-}
-
-function nodeTitle(node: Scene[number], index: number) {
+function title(node: Scene[number], index: number) {
   if (isStartRouter(node)) return "Scene Start";
   if (!isDialogueNode(node)) return `Node ${index}`;
-  if (node.choices?.length) return node.text || "User Prompt";
-  return node.speaker || node.text || `Node ${index}`;
+  return node.choices?.length ? node.text || "User Prompt" : node.speaker || node.text || `Node ${index}`;
+}
+function choiceId(sceneIndex: number, choiceIndex: number) { return `choice-${sceneIndex}-${choiceIndex}`; }
+function sceneId(sceneIndex: number) { return `scene-${sceneIndex}`; }
+function nodeId(selected: SelectedNode) {
+  return selected.kind === "scene" ? sceneId(selected.sceneIndex) : choiceId(selected.sceneIndex, selected.choiceIndex);
+}
+function nodeHeight(node: Scene[number]) {
+  if (isStartRouter(node)) return 70;
+  if (!isDialogueNode(node)) return 80;
+  const text = node.text || "";
+  return Math.min(150, 82 + Math.max(0, Math.ceil(text.length / 42) - 1) * 14);
+}
+function choiceHeight(choice: Choice) {
+  return Math.min(120, 72 + Math.max(0, Math.ceil(choice.label.length / 32) - 2) * 14);
 }
 
-function nodeKind(node: Scene[number]) {
-  if (isStartRouter(node)) return "router";
-  if (isDialogueNode(node) && node.choices?.length) return "prompt";
-  return "dialogue";
-}
+type Visual = { id: string; kind: "scene" | "choice"; sceneIndex: number; choiceIndex?: number };
 
-function nodeWidth(node: Scene[number], expanded: boolean) {
-  if (isStartRouter(node)) return NODE_WIDTH;
-  return expanded ? EXPANDED_NODE_WIDTH : NODE_WIDTH;
-}
-
-function nodeHeight(node: Scene[number], expanded: boolean) {
-  if (isStartRouter(node)) return expanded ? 150 : 82;
-  if (!isDialogueNode(node)) return 120;
-
-  const textLines = wrappedLineCount(node.text || "", expanded ? 68 : 42);
-  if (!expanded) {
-    return HEADER_HEIGHT + 18 + Math.max(1, textLines) * 18 + 14;
-  }
-
-  const textAreaLines = Math.max(3, textLines);
-  const editorBaseHeight = node.choices?.length
-    ? 420 + Math.max(0, node.choices.length - 1) * 8
-    : 390;
-  return editorBaseHeight + Math.max(0, textAreaLines - 4) * 18;
-}
-
-function choiceVisualId(sceneIndex: number, choiceIndex: number) {
-  return `choice-${sceneIndex}-${choiceIndex}`;
-}
-
-function sceneVisualId(sceneIndex: number) {
-  return `scene-${sceneIndex}`;
-}
-
-function choiceNodeHeight(choice: ChoiceVisual) {
-  const lines = Math.max(2, Math.ceil(Math.max(1, choice.label.length) / 38));
-  return CHOICE_NODE_BASE_HEIGHT + (lines - 2) * 18;
-}
-
-function getVisualNodes(sceneData: Scene): VisualNode[] {
-  const nodes: VisualNode[] = sceneData.map((_, sceneIndex) => ({
-    id: sceneVisualId(sceneIndex),
-    kind: "scene",
-    sceneIndex,
-  }));
-
-  sceneData.forEach((node, sceneIndex) => {
+function visuals(scene: Scene): Visual[] {
+  const result: Visual[] = scene.map((_, i) => ({ id: sceneId(i), kind: "scene", sceneIndex: i }));
+  scene.forEach((node, i) => {
     if (!isDialogueNode(node)) return;
-    node.choices?.forEach((choice, choiceIndex) => {
-      nodes.push({
-        id: choiceVisualId(sceneIndex, choiceIndex),
-        kind: "choice",
-        sceneIndex,
-        choiceIndex,
-        label: choice.label,
-        next: choice.next,
-      });
-    });
+    (node.choices ?? []).forEach((_, j) => result.push({ id: choiceId(i, j), kind: "choice", sceneIndex: i, choiceIndex: j }));
   });
-
-  return nodes;
+  return result;
 }
 
-function getEdges(sceneData: Scene): Edge[] {
-  const edges: Edge[] = [];
+type Edge = { from: string; to: string; choice?: boolean };
 
-  sceneData.forEach((node, sceneIndex) => {
+function edges(scene: Scene): Edge[] {
+  const result: Edge[] = [];
+  scene.forEach((node, i) => {
     if (isStartRouter(node)) {
-      const target = node.start_index_if_flag.default;
-      if (sceneData[target]) {
-        edges.push({ from: sceneVisualId(sceneIndex), to: sceneVisualId(target) });
-      }
+      const next = node.start_index_if_flag.default;
+      if (scene[next]) result.push({ from: sceneId(i), to: sceneId(next) });
       return;
     }
-
     if (!isDialogueNode(node)) return;
-
     if (node.choices?.length) {
-      node.choices.forEach((choice, choiceIndex) => {
-        const choiceId = choiceVisualId(sceneIndex, choiceIndex);
-        edges.push({
-          from: sceneVisualId(sceneIndex),
-          to: choiceId,
-          choice: true,
-        });
-        if (choice.next !== null && sceneData[choice.next]) {
-          edges.push({
-            from: choiceId,
-            to: sceneVisualId(choice.next),
-            label: choice.label,
-            choice: true,
-          });
-        }
+      node.choices.forEach((choice, j) => {
+        const id = choiceId(i, j);
+        result.push({ from: sceneId(i), to: id, choice: true });
+        if (choice.next !== null && scene[choice.next]) result.push({ from: id, to: sceneId(choice.next), choice: true });
       });
-    } else if (node.next !== null && sceneData[node.next]) {
-      edges.push({ from: sceneVisualId(sceneIndex), to: sceneVisualId(node.next) });
+    } else if (node.next !== null && scene[node.next]) {
+      result.push({ from: sceneId(i), to: sceneId(node.next) });
     }
   });
-
-  return edges;
+  return result;
 }
 
-function autoTreePositions(
-  sceneData: Scene,
-  expanded: Set<number>,
-  nodeGapY: number,
-): Record<string, Point> {
-  const visualNodes = getVisualNodes(sceneData);
-  const edges = getEdges(sceneData);
-  const byId = new Map(visualNodes.map((node) => [node.id, node]));
+function autoLayout(scene: Scene): Record<string, Point> {
+  const nodes = visuals(scene);
+  const links = edges(scene);
   const children = new Map<string, string[]>();
-
-  edges.forEach((edge) => {
-    const list = children.get(edge.from) ?? [];
-    list.push(edge.to);
-    children.set(edge.from, list);
+  const parents = new Map<string, string[]>();
+  links.forEach((edge) => {
+    children.set(edge.from, [...(children.get(edge.from) ?? []), edge.to]);
+    parents.set(edge.to, [...(parents.get(edge.to) ?? []), edge.from]);
   });
 
-  const rootId = isStartRouter(sceneData[0])
-    ? sceneVisualId(0)
-    : sceneData[0]
-      ? sceneVisualId(0)
-      : visualNodes[0]?.id;
-
-  const level = new Map<string, number>();
-  if (rootId) level.set(rootId, 0);
-
-  const queue = rootId ? [rootId] : [];
+  const root = scene.length ? sceneId(0) : undefined;
+  const levels = new Map<string, number>();
+  if (root) levels.set(root, 0);
+  const queue = root ? [root] : [];
   while (queue.length) {
     const current = queue.shift()!;
-    const currentLevel = level.get(current) ?? 0;
     for (const child of children.get(current) ?? []) {
-      if (!level.has(child)) {
-        level.set(child, currentLevel + 1);
+      if (!levels.has(child)) {
+        levels.set(child, (levels.get(current) ?? 0) + 1);
         queue.push(child);
       }
     }
   }
+  let fallback = Math.max(-1, ...levels.values()) + 1;
+  nodes.forEach((node) => { if (!levels.has(node.id)) levels.set(node.id, fallback++); });
 
-  // Put disconnected/cyclic nodes after the reachable tree instead of leaving them at 0,0.
-  let fallbackLevel = Math.max(-1, ...level.values()) + 1;
-  visualNodes.forEach((node) => {
-    if (!level.has(node.id)) {
-      level.set(node.id, fallbackLevel++);
-    }
-  });
-
-  const levels = new Map<number, VisualNode[]>();
-  visualNodes.forEach((node) => {
-    const nodeLevel = level.get(node.id) ?? 0;
-    const list = levels.get(nodeLevel) ?? [];
-    list.push(node);
-    levels.set(nodeLevel, list);
-  });
-
-  // Order each level around the average parent position so branches stay visually grouped.
-  const indexById = new Map(visualNodes.map((node, index) => [node.id, index]));
-  const parentIds = new Map<string, string[]>();
-  edges.forEach((edge) => {
-    const list = parentIds.get(edge.to) ?? [];
-    list.push(edge.from);
-    parentIds.set(edge.to, list);
+  const byLevel = new Map<number, Visual[]>();
+  nodes.forEach((node) => {
+    const level = levels.get(node.id) ?? 0;
+    byLevel.set(level, [...(byLevel.get(level) ?? []), node]);
   });
 
   const positions: Record<string, Point> = {};
-  const occupied = new Map<number, number>();
-
-  const levelsSorted = [...levels.keys()].sort((a, b) => a - b);
-  levelsSorted.forEach((nodeLevel) => {
-    const nodes = levels.get(nodeLevel) ?? [];
-    nodes.sort((a, b) => {
-      const aParents = parentIds.get(a.id) ?? [];
-      const bParents = parentIds.get(b.id) ?? [];
-      const aParentX = aParents.reduce((sum, parentId) => sum + (positions[parentId]?.x ?? 0), 0) / Math.max(1, aParents.length);
-      const bParentX = bParents.reduce((sum, parentId) => sum + (positions[parentId]?.x ?? 0), 0) / Math.max(1, bParents.length);
-      return aParentX - bParentX || (indexById.get(a.id) ?? 0) - (indexById.get(b.id) ?? 0);
+  [...byLevel.keys()].sort((a, b) => a - b).forEach((level) => {
+    const row = byLevel.get(level) ?? [];
+    row.sort((a, b) => {
+      const ax = (parents.get(a.id) ?? []).reduce((sum, id) => sum + (positions[id]?.x ?? 0), 0);
+      const bx = (parents.get(b.id) ?? []).reduce((sum, id) => sum + (positions[id]?.x ?? 0), 0);
+      return ax - bx || a.sceneIndex - b.sceneIndex || (a.choiceIndex ?? -1) - (b.choiceIndex ?? -1);
     });
-
-    let cursor = TREE_PADDING_X;
-    const rowHeight = Math.max(
-      ...nodes.map((node) =>
-        node.kind === "choice"
-          ? choiceNodeHeight(node)
-          : nodeHeight(sceneData[node.sceneIndex], expanded.has(node.sceneIndex)),
-      ),
-    );
-
-    nodes.forEach((node) => {
-      const width = node.kind === "choice" ? CHOICE_WIDTH : nodeWidth(sceneData[node.sceneIndex], expanded.has(node.sceneIndex));
-      const parents = parentIds.get(node.id) ?? [];
-      const preferred = parents.length
-        ? parents.reduce((sum, parentId) => sum + (positions[parentId]?.x ?? cursor), 0) / parents.length
-        : cursor;
-      const x = Math.max(cursor, preferred - width / 2);
+    let x = TREE_PADDING;
+    row.forEach((node) => {
+      const width = node.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+      const parentXs = (parents.get(node.id) ?? []).map((id) => positions[id]?.x).filter((v): v is number => v !== undefined);
+      const preferred = parentXs.length ? parentXs.reduce((a, b) => a + b, 0) / parentXs.length : x;
+      x = Math.max(x, preferred - width / 2);
       positions[node.id] = { x, y: 0 };
-      cursor = x + width + NODE_GAP_X;
-      occupied.set(nodeLevel, cursor);
-    });
-
-    const rowY = TREE_PADDING_Y + levelsSorted
-      .slice(0, levelsSorted.indexOf(nodeLevel))
-      .reduce((sum, level) => {
-        const levelNodes = levels.get(level) ?? [];
-        const levelHeight = Math.max(
-          ...levelNodes.map((item) =>
-            item.kind === "choice"
-              ? choiceNodeHeight(item)
-              : nodeHeight(sceneData[item.sceneIndex], expanded.has(item.sceneIndex)),
-          ),
-        );
-        return sum + levelHeight + nodeGapY;
-      }, 0);
-
-    nodes.forEach((node) => {
-      positions[node.id].y = rowY;
+      x += width + NODE_GAP_X;
     });
   });
 
-  // Center the start node over its first branch when possible.
-  if (rootId && positions[rootId]) {
-    const rootChildren = children.get(rootId) ?? [];
-    const childXs = rootChildren.map((id) => positions[id]?.x).filter((x): x is number => x !== undefined);
-    if (childXs.length) {
-      const rootVisual = byId.get(rootId);
-      const rootWidth = rootVisual?.kind === "choice"
-        ? CHOICE_WIDTH
-        : rootVisual?.kind === "scene"
-          ? nodeWidth(sceneData[rootVisual.sceneIndex], expanded.has(rootVisual.sceneIndex))
-          : NODE_WIDTH;
-      const center = (Math.min(...childXs) + Math.max(...childXs)) / 2;
-      positions[rootId].x = Math.max(TREE_PADDING_X, center - rootWidth / 2);
-    }
-  }
-
+  let y = TREE_PADDING;
+  [...byLevel.keys()].sort((a, b) => a - b).forEach((level) => {
+    const row = byLevel.get(level) ?? [];
+    const h = Math.max(...row.map((node) => node.kind === "choice" ? choiceHeight(scene[node.sceneIndex].choices![node.choiceIndex!]) : nodeHeight(scene[node.sceneIndex])));
+    row.forEach((node) => { positions[node.id].y = y; });
+    y += h + NODE_GAP_Y;
+  });
   return positions;
 }
 
-type SceneMapProps = {
-  sceneData: Scene;
-  expanded: Set<number>;
-  onToggle: (index: number) => void;
-  onChangeNode: (index: number, node: DialogueNodeType | StartRouter) => void;
-  onAdd: (index: number) => void;
-  onDuplicate: (index: number) => void;
-  onDelete: (index: number) => void;
-};
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="scene-inspector-field"><span>{label}</span>{children}</label>;
+}
 
-function SceneMap({
-  sceneData,
-  expanded,
-  onToggle,
-  onChangeNode,
+function SceneInspector({
+  scene,
+  selected,
+  onChange,
   onAdd,
   onDuplicate,
   onDelete,
-}: SceneMapProps) {
-  const [nodeGapY, setNodeGapY] = useState(DEFAULT_NODE_GAP_Y);
-  const initialLayout = useMemo(() => autoTreePositions(sceneData, expanded, nodeGapY), [sceneData, expanded, nodeGapY]);
-  const [positions, setPositions] = useState<Record<string, Point>>(initialLayout);
+}: {
+  scene: Scene;
+  selected: SelectedNode | null;
+  onChange: (index: number, node: DialogueNodeType | StartRouter) => void;
+  onAdd: (index: number) => void;
+  onDuplicate: (index: number) => void;
+  onDelete: (index: number) => void;
+}) {
+  if (!selected) return <aside className="scene-inspector"><div className="scene-inspector-empty"><strong>No node selected</strong><span>Select a node in the graph to edit its data.</span></div></aside>;
+
+  if (selected.kind === "choice") {
+    const parent = scene[selected.sceneIndex];
+    if (!isDialogueNode(parent)) return null;
+    const choice = parent.choices?.[selected.choiceIndex];
+    if (!choice) return null;
+    const update = (patch: Partial<Choice>) => {
+      const choices = [...(parent.choices ?? [])];
+      choices[selected.choiceIndex] = { ...choices[selected.choiceIndex], ...patch };
+      onChange(selected.sceneIndex, { ...parent, choices });
+    };
+    return (
+      <aside className="scene-inspector">
+        <div className="scene-inspector-header"><span>BRANCH</span><strong>Choice #{selected.choiceIndex + 1}</strong><small>Node #{selected.sceneIndex}</small></div>
+        <div className="scene-inspector-body">
+          <Field label="Label"><textarea value={choice.label} onChange={(e) => update({ label: e.target.value })} rows={5} /></Field>
+          <Field label="Goes to"><select value={choice.next ?? ""} onChange={(e) => update({ next: e.target.value === "" ? null : Number(e.target.value) })}><option value="">No destination</option>{scene.map((_, i) => <option key={i} value={i}>Node #{i} — {title(scene[i], i)}</option>)}</select></Field>
+          <div className="scene-inspector-actions"><button type="button" className="danger" onClick={() => {
+            const choices = (parent.choices ?? []).filter((_, i) => i !== selected.choiceIndex);
+            onChange(selected.sceneIndex, { ...parent, choices: choices.length ? choices : undefined });
+          }}>Delete Choice</button></div>
+        </div>
+      </aside>
+    );
+  }
+
+  const node = scene[selected.sceneIndex];
+  if (isStartRouter(node)) {
+    return (
+      <aside className="scene-inspector">
+        <div className="scene-inspector-header"><span>SCENE NODE</span><strong>Scene Start</strong><small>Node #0</small></div>
+        <div className="scene-inspector-body">
+          <p className="scene-inspector-help">Controls which node starts when a flag condition matches.</p>
+          {Object.entries(node.start_index_if_flag).map(([flag, value]) => (
+            <Field key={flag} label={flag}><input type="number" value={value} onChange={(e) => onChange(selected.sceneIndex, { ...node, start_index_if_flag: { ...node.start_index_if_flag, [flag]: Number(e.target.value) } })} /></Field>
+          ))}
+        </div>
+      </aside>
+    );
+  }
+
+  if (!isDialogueNode(node)) return null;
+  const update = <K extends keyof DialogueNodeType>(field: K, value: DialogueNodeType[K]) => onChange(selected.sceneIndex, { ...node, [field]: value });
+  return (
+    <aside className="scene-inspector">
+      <div className="scene-inspector-header"><span>{node.choices?.length ? "USER PROMPT" : "DIALOGUE"}</span><strong>Node #{selected.sceneIndex}</strong><small>{node.speaker || "No speaker"}</small></div>
+      <div className="scene-inspector-body">
+        <Field label="Speaker"><input value={node.speaker} onChange={(e) => update("speaker", e.target.value)} placeholder="Speaker" /></Field>
+        <Field label={node.choices?.length ? "User Prompt" : "Dialogue"}><textarea value={node.text} onChange={(e) => update("text", e.target.value)} rows={8} /></Field>
+        <Field label="Translation"><textarea value={node.translation ?? ""} onChange={(e) => update("translation", e.target.value || undefined)} rows={5} /></Field>
+        <Field label="Word IDs"><textarea value={(node.word_ids ?? []).join("\n")} onChange={(e) => update("word_ids", e.target.value.split(/[,\n]/).map((id) => id.trim()).filter(Boolean))} rows={4} placeholder={"w128\nw129"} /><small>One ID per line or comma-separated.</small></Field>
+        <Field label="Next"><select value={node.next ?? ""} onChange={(e) => update("next", e.target.value === "" ? null : Number(e.target.value))}><option value="">End</option>{scene.map((_, i) => <option key={i} value={i}>Node #{i} — {title(scene[i], i)}</option>)}</select></Field>
+        <Field label="Set Flag on Enter"><input value={node.set_flag_on_enter ?? ""} onChange={(e) => update("set_flag_on_enter", e.target.value || undefined)} placeholder="optional flag" /></Field>
+        <div className="scene-inspector-section"><div className="scene-inspector-section-title">Choices</div>{node.choices?.map((choice, i) => <button key={i} type="button" className="scene-inspector-choice" onClick={() => {}}><span>#{i + 1}</span>{choice.label || "Empty choice"}</button>)}<button type="button" onClick={() => onChange(selected.sceneIndex, { ...node, choices: [...(node.choices ?? []), { label: "New choice", next: null }] })}>+ Add Choice</button></div>
+        <div className="scene-inspector-actions"><button type="button" onClick={() => onAdd(selected.sceneIndex)}>+ Add Node</button><button type="button" onClick={() => onDuplicate(selected.sceneIndex)}>Duplicate</button><button type="button" className="danger" onClick={() => onDelete(selected.sceneIndex)}>Delete</button></div>
+      </div>
+    </aside>
+  );
+}
+
+function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: SelectedNode | null; onSelect: (node: SelectedNode) => void }) {
+  const [positions, setPositions] = useState<Record<string, Point>>(() => autoLayout(scene));
   const [scale, setScale] = useState(0.9);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
-  const [dragging, setDragging] = useState<{ id: string; start: Point; origin: Point } | null>(null);
   const [panning, setPanning] = useState<{ start: Point; origin: Point } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const layout = useMemo(() => autoLayout(scene), [scene]);
 
-  // Reflow the tree whenever a node is expanded/collapsed so the newly
-  // changed node height cannot overlap the level below it. Manual dragging
-  // is preserved while editing; the reflow is only tied to expansion state.
-  useEffect(() => {
-    setPositions(autoTreePositions(sceneData, expanded, nodeGapY));
-  }, [expanded, nodeGapY]);
+  const display = useMemo(() => Object.fromEntries(visuals(scene).map((node) => [node.id, positions[node.id] ?? layout[node.id]])) as Record<string, Point>, [scene, positions, layout]);
 
-
-  const visualNodes = useMemo(() => getVisualNodes(sceneData), [sceneData]);
-  const edges = useMemo(() => getEdges(sceneData), [sceneData]);
-  const visualById = useMemo(() => new Map(visualNodes.map((node) => [node.id, node])), [visualNodes]);
-  const displayPositions = useMemo(() => {
-    const fallback = autoTreePositions(sceneData, expanded, nodeGapY);
-    return Object.fromEntries(
-      visualNodes.map((node) => [node.id, positions[node.id] ?? fallback[node.id] ?? { x: TREE_PADDING_X, y: TREE_PADDING_Y }]),
-    ) as Record<string, Point>;
-  }, [sceneData, expanded, positions, visualNodes, nodeGapY]);
-
-  function canvasPoint(event: React.PointerEvent) {
+  function point(e: React.PointerEvent) {
     const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : { x: 0, y: 0 };
   }
-
-  function startNodeDrag(event: React.PointerEvent, id: string) {
-    const target = event.target as HTMLElement;
-    if (target.closest("input, textarea, select, button, [data-no-drag]")) return;
-
-    event.stopPropagation();
-    const point = canvasPoint(event);
-    setDragging({
-      id,
-      start: point,
-      origin: displayPositions[id],
-    });
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  function panStart(e: React.PointerEvent) {
+    if ((e.target as HTMLElement).closest("[data-node]")) return;
+    setPanning({ start: point(e), origin: offset });
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
-
-  function movePointer(event: React.PointerEvent) {
-    const point = canvasPoint(event);
-
-    if (dragging) {
-      const dx = (point.x - dragging.start.x) / scale;
-      const dy = (point.y - dragging.start.y) / scale;
-      setPositions((current) => ({
-        ...current,
-        [dragging.id]: {
-          x: dragging.origin.x + dx,
-          y: dragging.origin.y + dy,
-        },
-      }));
-    } else if (panning) {
-      setOffset({
-        x: panning.origin.x + point.x - panning.start.x,
-        y: panning.origin.y + point.y - panning.start.y,
-      });
-    }
+  function panMove(e: React.PointerEvent) {
+    if (!panning) return;
+    const p = point(e);
+    setOffset({ x: panning.origin.x + p.x - panning.start.x, y: panning.origin.y + p.y - panning.start.y });
   }
+  function zoom(delta: number) { setScale((v) => Math.min(1.5, Math.max(0.5, Number((v + delta).toFixed(2))))); }
 
-  function stopPointer() {
-    setDragging(null);
-    setPanning(null);
-  }
+  function arrange() { setPositions(autoLayout(scene)); setScale(0.9); setOffset({ x: 0, y: 0 }); }
 
-  function startPan(event: React.PointerEvent) {
-    if ((event.target as HTMLElement).closest("[data-node]")) return;
-    const point = canvasPoint(event);
-    setPanning({ start: point, origin: offset });
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  }
-
-  function zoom(delta: number) {
-    setScale((value) =>
-      Math.min(1.5, Math.max(0.55, Number((value + delta).toFixed(2)))),
-    );
-  }
-
-  function updateDialogueField<K extends keyof DialogueNodeType>(
-    index: number,
-    field: K,
-    value: DialogueNodeType[K],
-  ) {
-    const node = sceneData[index];
-    if (!isDialogueNode(node)) return;
-    onChangeNode(index, { ...node, [field]: value });
-  }
-
-  function updateChoice(index: number, choiceIndex: number, patch: Partial<Choice>) {
-    const node = sceneData[index];
-    if (!isDialogueNode(node)) return;
-
-    const choices = [...(node.choices ?? [])];
-    choices[choiceIndex] = { ...choices[choiceIndex], ...patch };
-    onChangeNode(index, { ...node, choices });
-  }
-
-  function addChoice(index: number) {
-    const node = sceneData[index];
-    if (!isDialogueNode(node)) return;
-
-    onChangeNode(index, {
-      ...node,
-      choices: [...(node.choices ?? []), { label: "New choice", next: null }],
-    });
-  }
-
-  function deleteChoice(index: number, choiceIndex: number) {
-    const node = sceneData[index];
-    if (!isDialogueNode(node)) return;
-
-    const choices = (node.choices ?? []).filter((_, i) => i !== choiceIndex);
-    onChangeNode(index, {
-      ...node,
-      choices: choices.length ? choices : undefined,
-    });
-  }
-
-  function handleToggle(index: number) {
-    const next = new Set(expanded);
-    if (next.has(index)) next.delete(index);
-    else next.add(index);
-    setPositions(autoTreePositions(sceneData, next, nodeGapY));
-    onToggle(index);
-  }
-
-  function renderSceneNode(node: Scene[number], index: number) {
-    const isExpanded = expanded.has(index);
-    const kind = nodeKind(node);
-
-    if (isStartRouter(node)) {
-      return (
-        <div className={`scene-map-node scene-map-node-router ${isExpanded ? "is-expanded" : ""}`} data-node>
-          <div className="scene-map-node-head" data-no-drag>
-            <div>
-              <span className="scene-map-node-type">START</span>
-              <strong>Scene Start</strong>
-            </div>
-            <button type="button" onClick={() => handleToggle(index)} className="scene-map-expand">
-              {isExpanded ? "⌃" : "⌄"}
-            </button>
-          </div>
-          {isExpanded && (
-            <div className="scene-map-node-editor">
-              <p className="scene-map-help">Controls which node starts when a flag condition matches.</p>
-              {Object.entries(node.start_index_if_flag).map(([flag, value]) => (
-                <div key={flag} className="scene-map-field-row">
-                  <span>{flag}</span>
-                  <input
-                    type="number"
-                    value={value}
-                    onChange={(event) =>
-                      onChangeNode(index, {
-                        ...node,
-                        start_index_if_flag: {
-                          ...node.start_index_if_flag,
-                          [flag]: Number(event.target.value),
-                        },
-                      })
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (!isDialogueNode(node)) return null;
-    const choices = node.choices ?? [];
-
-    return (
-      <div
-        className={`scene-map-node scene-map-node-${kind} ${isExpanded ? "is-expanded" : ""}`}
-        data-node
-        onPointerDown={(event) => startNodeDrag(event, sceneVisualId(index))}
-      >
-        <div className="scene-map-node-head">
-          <div className="scene-map-node-heading">
-            <span className="scene-map-node-number">#{index}</span>
-            <span className="scene-map-node-type">{choices.length ? "USER PROMPT" : "DIALOGUE"}</span>
-            <strong>{nodeTitle(node, index)}</strong>
-          </div>
-          <button
-            type="button"
-            onClick={() => handleToggle(index)}
-            className="scene-map-expand"
-            data-no-drag
-            aria-label={isExpanded ? "Collapse node" : "Expand node"}
-          >
-            {isExpanded ? "⌃" : "⌄"}
-          </button>
-        </div>
-
-        {!isExpanded && (
-          <div className="scene-map-node-collapsed">
-            <span>{node.text || "Empty dialogue"}</span>
-            {choices.length > 0 && <em>{choices.length} branch{choices.length === 1 ? "" : "es"}</em>}
-          </div>
-        )}
-
-        {isExpanded && (
-          <div className="scene-map-node-editor" data-no-drag>
-            <label>
-              <span>Speaker</span>
-              <input
-                value={node.speaker}
-                onChange={(event) => updateDialogueField(index, "speaker", event.target.value)}
-                placeholder={choices.length ? "User prompt" : "Speaker"}
-              />
-            </label>
-            <label>
-              <span>{choices.length ? "User Prompt" : "Dialogue"}</span>
-              <textarea
-                value={node.text}
-                onChange={(event) => updateDialogueField(index, "text", event.target.value)}
-                rows={Math.max(3, wrappedLineCount(node.text || "", 68))}
-                placeholder={choices.length ? "What should the player be asked?" : "Enter dialogue..."}
-              />
-            </label>
-            <label>
-              <span>Word IDs</span>
-              <textarea
-                value={(node.word_ids ?? []).join("\n")}
-                onChange={(event) =>
-                  updateDialogueField(
-                    index,
-                    "word_ids",
-                    event.target.value
-                      .split(/[,\n]/)
-                      .map((id) => id.trim())
-                      .filter(Boolean),
-                  )
-                }
-                rows={2}
-                placeholder={"w128\nw129"}
-              />
-              <small className="scene-map-help">One word ID per line or comma-separated.</small>
-            </label>
-            {choices.length > 0 ? (
-              <div className="scene-choice-branches">
-                <div className="scene-choice-title">
-                  <span>BRANCH NODES</span>
-                  <button type="button" onClick={() => addChoice(index)}>+ Choice</button>
-                </div>
-                <p className="scene-map-help">Choices are separate branch nodes below this prompt. Edit them on the branch itself.</p>
-              </div>
-            ) : (
-              <div className="scene-map-actions-inline">
-                <button type="button" onClick={() => addChoice(index)}>+ Turn into User Prompt</button>
-                <label className="scene-inline-next">
-                  <span>Next</span>
-                  <select
-                    value={node.next ?? ""}
-                    onChange={(event) =>
-                      updateDialogueField(index, "next", event.target.value === "" ? null : Number(event.target.value))
-                    }
-                  >
-                    <option value="">End</option>
-                    {sceneData.map((_, nodeIndex) => (
-                      <option key={nodeIndex} value={nodeIndex}>Node #{nodeIndex} — {nodeTitle(sceneData[nodeIndex], nodeIndex)}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
-            {choices.length > 0 && (
-              <div className="scene-map-actions-inline">
-                <label className="scene-inline-next">
-                  <span>Fallback Next</span>
-                  <select
-                    value={node.next ?? ""}
-                    onChange={(event) =>
-                      updateDialogueField(index, "next", event.target.value === "" ? null : Number(event.target.value))
-                    }
-                  >
-                    <option value="">None</option>
-                    {sceneData.map((_, nodeIndex) => (
-                      <option key={nodeIndex} value={nodeIndex}>Node #{nodeIndex} — {nodeTitle(sceneData[nodeIndex], nodeIndex)}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-            )}
-            <div className="scene-map-node-footer">
-              <button type="button" onClick={() => onAdd(index)}>+ Add Node</button>
-              <button type="button" onClick={() => onDuplicate(index)}>Duplicate</button>
-              <button type="button" className="danger" onClick={() => onDelete(index)}>Delete</button>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function renderChoiceNode(choice: ChoiceVisual) {
-    return (
-      <div
-        className="scene-map-choice-node"
-        data-node
-        onPointerDown={(event) => startNodeDrag(event, choice.id)}
-      >
-        <div className="scene-map-choice-head">
-          <span className="scene-map-node-type">CHOICE</span>
-          <span className="scene-map-choice-index">#{choice.choiceIndex + 1}</span>
-        </div>
-        <textarea
-          data-no-drag
-          value={choice.label}
-          onChange={(event) => updateChoice(choice.sceneIndex, choice.choiceIndex, { label: event.target.value })}
-          placeholder={`Choice ${choice.choiceIndex + 1}`}
-          rows={Math.max(2, Math.ceil(Math.max(1, choice.label.length) / 38))}
-        />
-        <div className="scene-map-choice-destination">
-          <span>GOES TO</span>
-          <select
-            data-no-drag
-            value={choice.next ?? ""}
-            onChange={(event) =>
-              updateChoice(choice.sceneIndex, choice.choiceIndex, {
-                next: event.target.value === "" ? null : Number(event.target.value),
-              })
-            }
-          >
-            <option value="">No destination</option>
-            {sceneData.map((_, nodeIndex) => (
-              <option key={nodeIndex} value={nodeIndex}>Node #{nodeIndex} — {nodeTitle(sceneData[nodeIndex], nodeIndex)}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="scene-choice-delete"
-            data-no-drag
-            onClick={() => deleteChoice(choice.sceneIndex, choice.choiceIndex)}
-            aria-label={`Delete choice ${choice.choiceIndex + 1}`}
-          >
-            ×
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const linkData = edges(scene);
+  const nodeVisuals = visuals(scene);
 
   return (
-    <div className="scene-map-wrap">
-      <div className="scene-map-toolbar">
-        <span>Tree layout • Drag nodes • Expand to edit • Drag empty space to pan • Scroll to zoom</span>
-        <div className="scene-map-actions">
-          <label className="scene-map-gap-control">
-            <span>Gap</span>
-            <input
-              type="range"
-              min="8"
-              max="64"
-              step="2"
-              value={nodeGapY}
-              onChange={(event) => {
-                const value = Number(event.target.value);
-                setNodeGapY(value);
-                setPositions(autoTreePositions(sceneData, expanded, value));
-              }}
-              aria-label="Vertical node gap"
-            />
-            <output>{nodeGapY}px</output>
-          </label>
-          <button type="button" onClick={() => zoom(0.1)}>+</button>
-          <span>{Math.round(scale * 100)}%</span>
-          <button type="button" onClick={() => zoom(-0.1)}>−</button>
-          <button
-            type="button"
-            onClick={() => {
-              setScale(0.9);
-              setOffset({ x: 0, y: 0 });
-              setPositions(autoTreePositions(sceneData, expanded, nodeGapY));
-            }}
-          >
-            Arrange Tree
-          </button>
-        </div>
+    <div className="scene-graph-panel">
+      <div className="scene-graph-toolbar">
+        <span>Node graph · select a node to edit it</span>
+        <div><button type="button" onClick={() => zoom(0.1)}>+</button><span>{Math.round(scale * 100)}%</span><button type="button" onClick={() => zoom(-0.1)}>−</button><button type="button" onClick={arrange}>Arrange</button></div>
       </div>
-
-      <div
-        ref={canvasRef}
-        className="scene-map"
-        onPointerDown={startPan}
-        onPointerMove={movePointer}
-        onPointerUp={stopPointer}
-        onPointerCancel={stopPointer}
-        onWheel={(event) => {
-          event.preventDefault();
-          zoom(event.deltaY > 0 ? -0.05 : 0.05);
-        }}
-      >
-        <div className="scene-map-world" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
-          <svg className="scene-map-edges" width="3200" height="2200" aria-hidden="true">
-            {edges.map((edge, edgeIndex) => {
-              const fromNode = visualById.get(edge.from);
-              const toNode = visualById.get(edge.to);
-              if (!fromNode || !toNode) return null;
-
-              const from = displayPositions[edge.from];
-              const to = displayPositions[edge.to];
+      <div ref={canvasRef} className="scene-graph-canvas" onPointerDown={panStart} onPointerMove={panMove} onPointerUp={() => setPanning(null)} onPointerCancel={() => setPanning(null)} onWheel={(e) => { e.preventDefault(); zoom(e.deltaY > 0 ? -0.05 : 0.05); }}>
+        <div className="scene-graph-world" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
+          <svg className="scene-graph-edges" width="3600" height="2600">
+            {linkData.map((edge, i) => {
+              const from = display[edge.from], to = display[edge.to];
               if (!from || !to) return null;
-
-              const fromHeight = fromNode.kind === "choice"
-                ? choiceNodeHeight(fromNode)
-                : nodeHeight(sceneData[fromNode.sceneIndex], expanded.has(fromNode.sceneIndex));
-              const toWidth = toNode.kind === "choice"
-                ? CHOICE_WIDTH
-                : nodeWidth(sceneData[toNode.sceneIndex], expanded.has(toNode.sceneIndex));
-
-              // Every connection leaves the bottom-center of its source and enters the top-center of its target.
-              const fromWidth = fromNode.kind === "choice"
-                ? CHOICE_WIDTH
-                : nodeWidth(sceneData[fromNode.sceneIndex], expanded.has(fromNode.sceneIndex));
-              const x1 = from.x + fromWidth / 2;
-              const y1 = from.y + fromHeight + 16;
-              const x2 = to.x + toWidth / 2;
-              const y2 = to.y - 16;
-              const bend = Math.max(45, Math.abs(y2 - y1) * 0.42);
-
-              return (
-                <g key={`${edge.from}-${edge.to}-${edgeIndex}`} className={`scene-map-edge ${edge.choice ? "is-choice" : ""}`}>
-                  <path
-                    d={`M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`}
-                  />
-                </g>
-              );
+              const fromVisual = nodeVisuals.find((n) => n.id === edge.from)!;
+              const toVisual = nodeVisuals.find((n) => n.id === edge.to)!;
+              const fromWidth = fromVisual.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+              const toWidth = toVisual.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+              const fromHeight = fromVisual.kind === "choice" ? choiceHeight(scene[fromVisual.sceneIndex].choices![fromVisual.choiceIndex!]) : nodeHeight(scene[fromVisual.sceneIndex]);
+              const x1 = from.x + fromWidth / 2, y1 = from.y + fromHeight;
+              const x2 = to.x + toWidth / 2, y2 = to.y;
+              const bend = Math.max(35, Math.abs(y2 - y1) * 0.4);
+              return <path key={i} className={`scene-graph-edge ${edge.choice ? "choice" : ""}`} d={`M ${x1} ${y1} C ${x1} ${y1 + bend}, ${x2} ${y2 - bend}, ${x2} ${y2}`} />;
             })}
           </svg>
-
-          {visualNodes.map((visual) => {
-            const position = displayPositions[visual.id];
-            const width = visual.kind === "choice"
-              ? CHOICE_WIDTH
-              : nodeWidth(sceneData[visual.sceneIndex], expanded.has(visual.sceneIndex));
+          {nodeVisuals.map((visual) => {
+            const p = display[visual.id];
+            const isSelected = selected && nodeId(selected) === visual.id;
+            const width = visual.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+            const source = scene[visual.sceneIndex];
+            const label = visual.kind === "choice" && isDialogueNode(source) ? source.choices![visual.choiceIndex!].label : title(source, visual.sceneIndex);
             return (
-              <div
-                key={visual.id}
-                style={{
-                  position: "absolute",
-                  left: position.x,
-                  top: position.y,
-                  width,
-                  minHeight: visual.kind === "choice"
-                    ? choiceNodeHeight(visual)
-                    : nodeHeight(sceneData[visual.sceneIndex], expanded.has(visual.sceneIndex)),
-                }}
-              >
-                {visual.kind === "choice"
-                  ? renderChoiceNode(visual)
-                  : renderSceneNode(sceneData[visual.sceneIndex], visual.sceneIndex)}
-              </div>
+              <button key={visual.id} type="button" data-node className={`scene-graph-node ${visual.kind} ${isSelected ? "selected" : ""}`} style={{ left: p.x, top: p.y, width }} onClick={(e) => { e.stopPropagation(); onSelect(visual.kind === "choice" ? { kind: "choice", sceneIndex: visual.sceneIndex, choiceIndex: visual.choiceIndex! } : { kind: "scene", sceneIndex: visual.sceneIndex }); }}>
+                <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
+                <strong>{visual.kind === "choice" ? label || "Empty choice" : label}</strong>
+                <small>{visual.kind === "choice" ? `→ ${source && isDialogueNode(source) && source.choices?.[visual.choiceIndex!]?.next !== null ? `Node #${source.choices![visual.choiceIndex!].next}` : "End"}` : `#${visual.sceneIndex}`}</small>
+              </button>
             );
           })}
         </div>
@@ -801,131 +293,55 @@ function SceneMap({
   );
 }
 
-function SceneEditor({ name, data, onChange }: SceneEditorProps) {
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+export default function SceneEditor({ name, data, onChange }: SceneEditorProps) {
+  const [selected, setSelected] = useState<SelectedNode | null>(isScene(data) && data.length ? { kind: "scene", sceneIndex: 0 } : null);
 
-  if (!isScene(data)) {
-    return (
-      <section>
-        <h2 className="mb-4 text-lg font-bold">{name}</h2>
-        <pre className="overflow-auto rounded-lg bg-zinc-900 p-4 text-sm">{JSON.stringify(data, null, 2)}</pre>
-      </section>
-    );
+  if (!isScene(data)) return <div className="scene-idle-view"><h2>{name}</h2><pre>{JSON.stringify(data, null, 2)}</pre></div>;
+
+  function updateNode(index: number, node: DialogueNodeType | StartRouter) {
+    const next = [...data];
+    next[index] = node;
+    onChange(next);
   }
 
-  const sceneData = data;
-
-  function updateNode(index: number, updatedNode: DialogueNodeType | StartRouter) {
-    const updatedScene = [...sceneData];
-    updatedScene[index] = updatedNode;
-    onChange(updatedScene);
+  function addNode(index: number) {
+    const insert = index + 1;
+    const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
+    const next = data.map((node): Scene[number] => isDialogueNode(node) ? { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : node);
+    next.splice(insert, 0, { speaker: "", text: "", next: null, word_ids: [] });
+    onChange(next);
+    setSelected({ kind: "scene", sceneIndex: insert });
   }
 
-  function handleAddNode(index: number) {
-    const newNode: DialogueNodeType = { speaker: "", text: "", next: null, word_ids: [] };
-    const insertIndex = index + 1;
-    const shift = (value: number | null) => value !== null && value >= insertIndex ? value + 1 : value;
-
-    const updatedScene: Scene = sceneData.map((node): Scene[number] => {
-      if (!isDialogueNode(node)) return node;
-      return {
-        ...node,
-        next: shift(node.next),
-        choices: node.choices?.map((choice) => ({ ...choice, next: shift(choice.next) })),
-      };
-    });
-
-    updatedScene.splice(insertIndex, 0, newNode);
-    onChange(updatedScene);
-    setExpanded((current) => {
-      const next = new Set<number>();
-      current.forEach((value) => next.add(value >= insertIndex ? value + 1 : value));
-      next.add(insertIndex);
-      return next;
-    });
-  }
-
-  function handleDuplicateNode(index: number) {
-    const node = sceneData[index];
+  function duplicateNode(index: number) {
+    const node = data[index];
     if (!isDialogueNode(node)) return;
-
-    const insertIndex = index + 1;
-    const shift = (value: number | null) => value !== null && value >= insertIndex ? value + 1 : value;
-    const updatedScene: Scene = sceneData.map((item): Scene[number] =>
-      isDialogueNode(item)
-        ? { ...item, next: shift(item.next), choices: item.choices?.map((choice) => ({ ...choice, next: shift(choice.next) })) }
-        : item,
-    );
-
-    updatedScene.splice(insertIndex, 0, {
-      ...node,
-      next: shift(node.next),
-      choices: node.choices?.map((choice) => ({ ...choice, next: shift(choice.next) })),
-    });
-
-    onChange(updatedScene);
-    setExpanded((current) => {
-      const next = new Set<number>();
-      current.forEach((value) => next.add(value >= insertIndex ? value + 1 : value));
-      next.add(insertIndex);
-      return next;
-    });
+    const insert = index + 1;
+    const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
+    const next = data.map((item): Scene[number] => isDialogueNode(item) ? { ...item, next: shift(item.next), choices: item.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : item);
+    next.splice(insert, 0, { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) });
+    onChange(next);
+    setSelected({ kind: "scene", sceneIndex: insert });
   }
 
-  function handleDeleteNode(index: number) {
-    if (!isDialogueNode(sceneData[index])) return;
-
-    const updatedScene = sceneData
-      .filter((_, i) => i !== index)
-      .map((node) => {
-        if (!isDialogueNode(node)) return node;
-        const fix = (value: number | null) => value === index ? null : value !== null && value > index ? value - 1 : value;
-        return {
-          ...node,
-          next: fix(node.next),
-          choices: node.choices?.map((choice) => ({ ...choice, next: fix(choice.next) })),
-        };
-      });
-
-    onChange(updatedScene);
-    setExpanded((current) => {
-      const next = new Set<number>();
-      current.forEach((value) => {
-        if (value < index) next.add(value);
-        else if (value > index) next.add(value - 1);
-      });
-      return next;
+  function deleteNode(index: number) {
+    if (!isDialogueNode(data[index])) return;
+    const next = data.filter((_, i) => i !== index).map((node): Scene[number] => {
+      if (!isDialogueNode(node)) return node;
+      const fix = (v: number | null) => v === index ? null : v !== null && v > index ? v - 1 : v;
+      return { ...node, next: fix(node.next), choices: node.choices?.map((c) => ({ ...c, next: fix(c.next) })) };
     });
-  }
-
-  function toggleNode(index: number) {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
+    onChange(next);
+    setSelected(index > 0 ? { kind: "scene", sceneIndex: index - 1 } : next.length ? { kind: "scene", sceneIndex: 0 } : null);
   }
 
   return (
-    <section>
-      <div className="mb-4 flex items-end justify-between">
-        <div>
-          <h2 className="text-lg font-bold">{name}</h2>
-          <p className="mt-1 text-sm text-zinc-500">{sceneData.length} nodes • tree layout with inline editing</p>
-        </div>
+    <div className="scene-editor-shell">
+      <div className="scene-editor-titlebar"><div><strong>{name}</strong><span>{data.length} nodes</span></div></div>
+      <div className="scene-editor-body">
+        <SceneMap scene={data} selected={selected} onSelect={setSelected} />
+        <SceneInspector scene={data} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} />
       </div>
-      <SceneMap
-        sceneData={sceneData}
-        expanded={expanded}
-        onToggle={toggleNode}
-        onChangeNode={updateNode}
-        onAdd={handleAddNode}
-        onDuplicate={handleDuplicateNode}
-        onDelete={handleDeleteNode}
-      />
-    </section>
+    </div>
   );
 }
-
-export default SceneEditor;
