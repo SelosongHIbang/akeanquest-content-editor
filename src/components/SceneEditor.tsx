@@ -12,7 +12,7 @@ type SceneEditorProps = {
 };
 
 type Point = { x: number; y: number };
-type SelectedNode = { kind: "scene"; sceneIndex: number } | { kind: "choice"; sceneIndex: number; choiceIndex: number };
+type SelectedNode = { kind: "scene"; sceneIndex: number } | { kind: "choice"; sceneIndex: number; choiceIndex: number } | { kind: "idle"; tier: keyof IdlePool; index: number };
 
 const NODE_WIDTH = 250;
 const CHOICE_WIDTH = 220;
@@ -35,7 +35,9 @@ function title(node: Scene[number], index: number) {
 function choiceId(sceneIndex: number, choiceIndex: number) { return `choice-${sceneIndex}-${choiceIndex}`; }
 function sceneId(sceneIndex: number) { return `scene-${sceneIndex}`; }
 function nodeId(selected: SelectedNode) {
-  return selected.kind === "scene" ? sceneId(selected.sceneIndex) : choiceId(selected.sceneIndex, selected.choiceIndex);
+  if (selected.kind === "scene") return sceneId(selected.sceneIndex);
+  if (selected.kind === "choice") return choiceId(selected.sceneIndex, selected.choiceIndex);
+  return `idle-${selected.tier}-${selected.index}`;
 }
 function nodeHeight(node: Scene[number]) {
   if (isStartRouter(node)) return 70;
@@ -457,6 +459,86 @@ function SceneInspector({
   );
 }
 
+function IdlePoolInspector({
+  pool,
+  selected,
+  onChange,
+}: {
+  pool: IdlePool;
+  selected: Extract<SelectedNode, { kind: "idle" }> | null;
+  onChange: (tier: keyof IdlePool, index: number, entry: IdlePool[keyof IdlePool][number]) => void;
+}) {
+  if (!selected) return <aside className="scene-inspector"><div className="scene-inspector-empty"><strong>No idle node selected</strong><span>Select an idle node from the pool to edit it.</span></div></aside>;
+
+  const entries = pool[selected.tier];
+  const entry = entries[selected.index];
+  if (!entry) return null;
+
+  const update = <K extends keyof typeof entry>(field: K, value: (typeof entry)[K]) =>
+    onChange(selected.tier, selected.index, { ...entry, [field]: value });
+
+  return (
+    <aside className="scene-inspector">
+      <div className="scene-inspector-header">
+        <span>IDLE POOL · {selected.tier.toUpperCase()}</span>
+        <strong>Idle #{selected.index}</strong>
+        <small>{entry.speaker || "No speaker"}</small>
+      </div>
+      <div className="scene-inspector-body">
+        <Field label="Speaker"><input value={entry.speaker} onChange={(e) => update("speaker", e.target.value)} placeholder="Speaker" /></Field>
+        <Field label="Dialogue"><textarea value={entry.text} onChange={(e) => update("text", e.target.value)} rows={8} /></Field>
+        <Field label="Word IDs">
+          <WordIdPicker value={entry.word_ids ?? []} onChange={(wordIds) => update("word_ids", wordIds)} />
+          <small>Search the word bank by Akeanon word, ID, or English gloss.</small>
+        </Field>
+      </div>
+    </aside>
+  );
+}
+
+function IdlePoolMap({
+  pool,
+  selected,
+  onSelect,
+}: {
+  pool: IdlePool;
+  selected: Extract<SelectedNode, { kind: "idle" }> | null;
+  onSelect: (node: Extract<SelectedNode, { kind: "idle" }>) => void;
+}) {
+  const tiers: (keyof IdlePool)[] = ["low", "med", "high"];
+
+  return (
+    <div className="scene-graph-panel">
+      <div className="scene-graph-toolbar">
+        <span>Idle Pool · select a node to edit it</span>
+        <span>{tiers.reduce((total, tier) => total + pool[tier].length, 0)} idle nodes</span>
+      </div>
+      <div className="idle-pool-grid-wrap">
+        <div className="idle-pool-grid">
+          {tiers.map((tier) => (
+            <section className="idle-pool-column" key={tier}>
+              <div className="idle-pool-column-header"><strong>{tier.toUpperCase()}</strong><span>{pool[tier].length}</span></div>
+              <div className="idle-pool-column-grid">
+                {pool[tier].map((entry, index) => {
+                  const isSelected = selected?.tier === tier && selected.index === index;
+                  return (
+                    <button type="button" key={`${tier}-${index}`} className={`idle-pool-node ${isSelected ? "selected" : ""}`} onClick={() => onSelect({ kind: "idle", tier, index })}>
+                      <span className="idle-pool-node-type">IDLE #{index}</span>
+                      <strong>{entry.text || "Empty idle line"}</strong>
+                      <small>{entry.speaker || "No speaker"}</small>
+                    </button>
+                  );
+                })}
+                {!pool[tier].length && <div className="idle-pool-empty">No idle nodes</div>}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: SelectedNode | null; onSelect: (node: SelectedNode) => void }) {
   const [positions, setPositions] = useState<Record<string, Point>>(() => autoLayout(scene));
   const [scale, setScale] = useState(0.9);
@@ -549,13 +631,22 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
 
 export default function SceneEditor({ name, data, onChange, onSave, onArchive }: SceneEditorProps) {
   const sceneData = data && isScene(data) ? data : null;
-  const [selected, setSelected] = useState<SelectedNode | null>(sceneData?.length ? { kind: "scene", sceneIndex: 0 } : null);
+  const idlePoolData = data && !isScene(data) ? data : null;
+  const [selected, setSelected] = useState<SelectedNode | null>(
+    sceneData?.length ? { kind: "scene", sceneIndex: 0 } : idlePoolData?.low.length ? { kind: "idle", tier: "low", index: 0 } : null
+  );
   const hasSelection = data !== null;
 
   function updateNode(index: number, node: DialogueNodeType | StartRouter) {
     if (!sceneData) return;
     const next = [...sceneData];
     next[index] = node;
+    onChange(next);
+  }
+
+  function updateIdle(tier: keyof IdlePool, index: number, entry: IdlePool[keyof IdlePool][number]) {
+    if (!idlePoolData) return;
+    const next: IdlePool = { ...idlePoolData, [tier]: idlePoolData[tier].map((item, itemIndex) => itemIndex === index ? entry : item) };
     onChange(next);
   }
 
@@ -607,12 +698,15 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive }:
       </div>
       {!data ? (
         <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>
-      ) : !sceneData ? (
-        <div className="scene-editor-body"><div className="scene-idle-view"><h2>{name}</h2><pre>{JSON.stringify(data, null, 2)}</pre></div></div>
+      ) : idlePoolData ? (
+        <div className="scene-editor-body">
+          <IdlePoolMap pool={idlePoolData} selected={selected?.kind === "idle" ? selected : null} onSelect={setSelected} />
+          <IdlePoolInspector pool={idlePoolData} selected={selected?.kind === "idle" ? selected : null} onChange={updateIdle} />
+        </div>
       ) : (
         <div className="scene-editor-body">
-          <SceneMap scene={sceneData} selected={selected} onSelect={setSelected} />
-          <SceneInspector scene={sceneData} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} />
+          <SceneMap scene={sceneData!} selected={selected} onSelect={setSelected} />
+          <SceneInspector scene={sceneData!} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} />
         </div>
       )}
     </div>
