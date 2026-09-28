@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import chapter1 from "./data/chapter1.json";
 import chapter2 from "./data/chapter2.json";
 import chapter3 from "./data/chapter3.json";
@@ -16,10 +16,6 @@ type SelectedScene = { chapterId: string; sceneName: string } | null;
 
 type UnknownRecord = Record<string, unknown>;
 
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null;
-}
-
 import Sidebar from "./components/Sidebar";
 import SceneEditor from "./components/SceneEditor";
 
@@ -33,44 +29,55 @@ const bundledChapters: Chapters = {
 };
 
 function App() {
-  const [chapters, setChapters] = useState<Chapters>(() => {
-    const saved = localStorage.getItem("akeanquest-content-draft");
-    if (saved) {
-      try {
-        const parsed: unknown = JSON.parse(saved);
-        if (isRecord(parsed) && isRecord(parsed.chapters)) {
-          return { ...bundledChapters, ...parsed.chapters } as Chapters;
-        }
-        if (isRecord(parsed) && Object.keys(parsed).length > 0) {
-          const looksLikeChapter = Object.values(parsed).some(
-            (value: unknown) => Array.isArray(value) || (
-              isRecord(value) && ("low" in value || "med" in value || "high" in value)
-            )
-          );
-          if (looksLikeChapter) return { ...bundledChapters, chapter1: parsed as Chapter };
-        }
-      } catch {
-        localStorage.removeItem("akeanquest-content-draft");
-      }
-    }
-    return bundledChapters;
-  });
+  const [chapters, setChapters] = useState<Chapters>(() => bundledChapters);
   const [selectedChapterId, setSelectedChapterId] = useState("chapter1");
   const [selectedScene, setSelectedScene] = useState<SelectedScene>(null);
   const [activeTab, setActiveTab] = useState<"scenes" | "word-bank">("scenes");
-  const [wordBank, setWordBank] = useState<WordBank>(() => {
-    const saved = localStorage.getItem("akeanquest-word-bank-draft");
-    if (saved) { try { return JSON.parse(saved) as WordBank; } catch { localStorage.removeItem("akeanquest-word-bank-draft"); } }
-    return wordBankData as WordBank;
-  });
+  const [wordBank, setWordBank] = useState<WordBank>(() => wordBankData as WordBank);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveGeneration = useRef(0);
 
-  useEffect(() => { localStorage.setItem("akeanquest-word-bank-draft", JSON.stringify(wordBank)); }, [wordBank]);
-  useEffect(() => { localStorage.setItem("akeanquest-content-draft", JSON.stringify({ chapters })); }, [chapters]);
+  useEffect(() => {
+    saveGeneration.current += 1;
+    const generation = saveGeneration.current;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await Promise.all([
+          ...Object.entries(chapters).map(([chapterId, content]) =>
+            fetch(`/__akeanquest/save/${chapterId}.json`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(content, null, 2),
+            }).then(async (response) => {
+              if (!response.ok) throw new Error(await response.text());
+            })
+          ),
+          fetch("/__akeanquest/save/word_bank.json", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(wordBank, null, 2),
+          }).then(async (response) => {
+            if (!response.ok) throw new Error(await response.text());
+          }),
+        ]);
+        if (generation === saveGeneration.current) {
+          console.info("[AkeanQuest] Content autosaved to src/data.");
+        }
+      } catch (error) {
+        console.error("[AkeanQuest] Autosave failed:", error);
+      }
+    }, 700);
+
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, [chapters, wordBank]);
 
   function handleSave() {
     if (!selectedScene) return;
     const content = chapters[selectedScene.chapterId];
-    localStorage.setItem("akeanquest-content-draft", JSON.stringify({ chapters }));
     const blob = new Blob([JSON.stringify(content, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
