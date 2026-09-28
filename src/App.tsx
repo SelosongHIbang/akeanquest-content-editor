@@ -56,7 +56,7 @@ function App() {
         <div className="file-toolbar-brand">AkeanQuest <span>Content Editor</span></div>
         <nav className="editor-tabs" aria-label="Editor tabs"><button type="button" className={activeTab === "scenes" ? "active" : ""} onClick={() => setActiveTab("scenes")}>Scenes</button><button type="button" className={activeTab === "word-bank" ? "active" : ""} onClick={() => setActiveTab("word-bank")}>Word Bank</button></nav>
         <div className="file-toolbar-actions">
-          <button type="button" onClick={handleAddScene}>+ Scene</button>
+          {activeTab === "scenes" && <button type="button" onClick={handleAddScene}>+ Scene</button>}
           <span className="save-status">● Draft saved locally</span>
           <button type="button" className="save-button" onClick={handleSave}>Save JSON</button>
         </div>
