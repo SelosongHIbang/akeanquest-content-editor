@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Scene,
   IdlePool,
@@ -327,6 +327,14 @@ function SceneMap({
   const [dragging, setDragging] = useState<{ id: string; start: Point; origin: Point } | null>(null);
   const [panning, setPanning] = useState<{ start: Point; origin: Point } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Reflow the tree whenever a node is expanded/collapsed so the newly
+  // changed node height cannot overlap the level below it. Manual dragging
+  // is preserved while editing; the reflow is only tied to expansion state.
+  useEffect(() => {
+    setPositions(autoTreePositions(sceneData, expanded));
+  }, [expanded]);
+
 
   const visualNodes = useMemo(() => getVisualNodes(sceneData), [sceneData]);
   const edges = useMemo(() => getEdges(sceneData), [sceneData]);
