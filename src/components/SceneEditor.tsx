@@ -83,8 +83,8 @@ function autoLayout(scene: Scene): Record<string, Point> {
   const positions: Record<string, Point> = {};
   const sceneNodes = scene.map((_, i) => i);
 
-  // Build normal dialogue/start-node links. Choice destinations are treated as
-  // one extra tree level so the choice row always belongs visually to its prompt.
+  // Build the scene graph. Choice links are represented separately so a
+  // destination can line up with the exact choice that leads to it.
   const nextChildren = new Map<number, number[]>();
   scene.forEach((node, i) => {
     if (isStartRouter(node)) {
@@ -103,6 +103,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
   const depth = new Map<number, number>();
   if (scene.length) depth.set(0, 0);
   const queue = scene.length ? [0] : [];
+
   while (queue.length) {
     const current = queue.shift()!;
     for (const child of nextChildren.get(current) ?? []) {
@@ -125,52 +126,104 @@ function autoLayout(scene: Scene): Record<string, Point> {
     rows.set(level, [...(rows.get(level) ?? []), i]);
   });
 
-  // Lay the actual scene nodes out as a conventional tree.
-  const sortedLevels = [...rows.keys()].sort((a, b) => a - b);
-  sortedLevels.forEach((level) => {
+  // First give every scene node a stable position. This provides a fallback
+  // for cycles/disconnected nodes and gives choice rows a prompt position.
+  [...rows.keys()].sort((a, b) => a - b).forEach((level) => {
     const row = rows.get(level) ?? [];
     row.sort((a, b) => a - b);
-
-    let x = TREE_PADDING;
-    row.forEach((sceneIndex) => {
-      const node = scene[sceneIndex];
-      const width = NODE_WIDTH;
-      const parentCandidates = sceneNodes
-        .filter((parentIndex) => (nextChildren.get(parentIndex) ?? []).includes(sceneIndex))
-        .map((parentIndex) => positions[sceneId(parentIndex)]?.x)
-        .filter((value): value is number => value !== undefined);
-
-      const preferred = parentCandidates.length
-        ? parentCandidates.reduce((sum, value) => sum + value, 0) / parentCandidates.length
-        : x;
-
-      x = Math.max(x, preferred - width / 2);
-      positions[sceneId(sceneIndex)] = { x, y: TREE_PADDING + level * 180 };
-      x += width + NODE_GAP_X;
+    row.forEach((sceneIndex, rowIndex) => {
+      positions[sceneId(sceneIndex)] = {
+        x: TREE_PADDING + rowIndex * (NODE_WIDTH + NODE_GAP_X),
+        y: TREE_PADDING + level * 180,
+      };
     });
   });
 
-  // Choices are always rendered, in source order, as one horizontal row
-  // centered under their prompt. They never participate in normal node packing.
-  scene.forEach((node, sceneIndex) => {
-    if (!isDialogueNode(node) || !node.choices?.length) return;
+  function placeChoices() {
+    scene.forEach((node, sceneIndex) => {
+      if (!isDialogueNode(node) || !node.choices?.length) return;
 
-    const prompt = positions[sceneId(sceneIndex)];
-    if (!prompt) return;
+      const prompt = positions[sceneId(sceneIndex)];
+      if (!prompt) return;
 
-    const groupWidth = node.choices.length * CHOICE_WIDTH
-      + Math.max(0, node.choices.length - 1) * NODE_GAP_X;
-    let x = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
-    const y = prompt.y + nodeHeight(node) + NODE_GAP_Y;
+      const groupWidth = node.choices.length * CHOICE_WIDTH
+        + Math.max(0, node.choices.length - 1) * NODE_GAP_X;
+      let x = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
+      const y = prompt.y + nodeHeight(node) + NODE_GAP_Y;
 
-    node.choices.forEach((_, choiceIndex) => {
-      positions[choiceId(sceneIndex, choiceIndex)] = { x, y };
-      x += CHOICE_WIDTH + NODE_GAP_X;
+      node.choices.forEach((_, choiceIndex) => {
+        positions[choiceId(sceneIndex, choiceIndex)] = { x, y };
+        x += CHOICE_WIDTH + NODE_GAP_X;
+      });
     });
-  });
+  }
 
-  // Guarantee every visual has a finite position, even for disconnected/cyclic
-  // content or unusual data.
+  // Repeatedly pull each destination onto the vertical line of the node or
+  // choice that leads to it. Multiple incoming links use their average center.
+  // Repeating also propagates branch alignment through several levels.
+  for (let pass = 0; pass < 4; pass += 1) {
+    placeChoices();
+
+    const desired = new Map<number, number>();
+    scene.forEach((node, sceneIndex) => {
+      const incomingCenters: number[] = [];
+
+      scene.forEach((source, sourceIndex) => {
+        if (isStartRouter(source)) {
+          if (source.start_index_if_flag.default === sceneIndex) {
+            const p = positions[sceneId(sourceIndex)];
+            if (p) incomingCenters.push(p.x + NODE_WIDTH / 2);
+          }
+          return;
+        }
+
+        if (!isDialogueNode(source)) return;
+
+        if (source.choices?.length) {
+          source.choices.forEach((choice, choiceIndex) => {
+            if (choice.next === sceneIndex) {
+              const p = positions[choiceId(sourceIndex, choiceIndex)];
+              if (p) incomingCenters.push(p.x + CHOICE_WIDTH / 2);
+            }
+          });
+        } else if (source.next === sceneIndex) {
+          const p = positions[sceneId(sourceIndex)];
+          if (p) incomingCenters.push(p.x + NODE_WIDTH / 2);
+        }
+      });
+
+      if (incomingCenters.length) {
+        desired.set(
+          sceneIndex,
+          incomingCenters.reduce((sum, value) => sum + value, 0) / incomingCenters.length,
+        );
+      }
+    });
+
+    // Apply desired centers one level at a time while preserving a small,
+    // constant horizontal gap between nodes on the same row.
+    [...rows.keys()].sort((a, b) => a - b).forEach((level) => {
+      const row = (rows.get(level) ?? []).slice().sort((a, b) => {
+        const da = desired.get(a) ?? (positions[sceneId(a)]?.x ?? 0) + NODE_WIDTH / 2;
+        const db = desired.get(b) ?? (positions[sceneId(b)]?.x ?? 0) + NODE_WIDTH / 2;
+        return da - db;
+      });
+
+      let previousRight = TREE_PADDING - NODE_GAP_X;
+      row.forEach((sceneIndex) => {
+        const current = positions[sceneId(sceneIndex)] ?? { x: TREE_PADDING, y: TREE_PADDING };
+        const targetCenter = desired.get(sceneIndex) ?? current.x + NODE_WIDTH / 2;
+        const x = Math.max(targetCenter - NODE_WIDTH / 2, previousRight + NODE_GAP_X);
+        positions[sceneId(sceneIndex)] = { x, y: current.y };
+        previousRight = x + NODE_WIDTH;
+      });
+    });
+  }
+
+  // Rebuild choice positions from the final prompt positions.
+  placeChoices();
+
+  // Guarantee every visual has a finite position, even for unusual data.
   visuals(scene).forEach((visual, index) => {
     if (!positions[visual.id]) {
       positions[visual.id] = {
