@@ -178,10 +178,11 @@ function autoLayout(scene: Scene): Record<string, Point> {
     if (!isDialogueNode(node) || !node.choices?.length) return;
 
     const prompt = positions[sceneId(sceneIndex)];
-    const center = (node.choices.length - 1) / 2;
 
     node.choices.forEach((choice, choiceIndex) => {
-      const choiceY = prompt.y + (choiceIndex - center) * ROW_PITCH;
+      // The first choice starts on the exact same row as the prompt.
+      // Additional choices continue downward on the fixed grid.
+      const choiceY = prompt.y + choiceIndex * ROW_PITCH;
 
       positions[choiceId(sceneIndex, choiceIndex)] = {
         x: prompt.x + NODE_WIDTH + COLUMN_GAP,
