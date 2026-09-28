@@ -81,154 +81,156 @@ function edges(scene: Scene): Edge[] {
 
 function autoLayout(scene: Scene): Record<string, Point> {
   const positions: Record<string, Point> = {};
-  const sceneNodes = scene.map((_, i) => i);
+  const COLUMN_GAP = NODE_WIDTH + 90;
+  const ROW_GAP = 210;
+  const CHOICE_GAP = 36;
 
-  // Build the scene graph. Choice links are represented separately so a
-  // destination can line up with the exact choice that leads to it.
-  const nextChildren = new Map<number, number[]>();
-  scene.forEach((node, i) => {
-    if (isStartRouter(node)) {
-      const next = node.start_index_if_flag.default;
-      if (scene[next]) nextChildren.set(i, [next]);
-    } else if (isDialogueNode(node) && !node.choices?.length && node.next !== null && scene[node.next]) {
-      nextChildren.set(i, [node.next]);
-    } else if (isDialogueNode(node) && node.choices?.length) {
-      const destinations = node.choices
-        .map((choice) => choice.next)
-        .filter((next): next is number => next !== null && !!scene[next]);
-      if (destinations.length) nextChildren.set(i, destinations);
-    }
-  });
-
+  // Strict grid:
+  // - Every depth is one fixed column.
+  // - Every row has one fixed Y coordinate.
+  // - A destination uses the same row as the node/choice that leads to it.
+  // - When several links point to the same destination, the first incoming
+  //   link owns the row; later links do not create a floating intermediate Y.
   const depth = new Map<number, number>();
   if (scene.length) depth.set(0, 0);
-  const queue = scene.length ? [0] : [];
 
+  const queue = scene.length ? [0] : [];
   while (queue.length) {
     const current = queue.shift()!;
-    for (const child of nextChildren.get(current) ?? []) {
-      const nextDepth = (depth.get(current) ?? 0) + 1;
-      if (!depth.has(child) || nextDepth < depth.get(child)!) {
-        depth.set(child, nextDepth);
-        queue.push(child);
+    const node = scene[current];
+    const children: number[] = [];
+
+    if (isStartRouter(node)) {
+      if (scene[node.start_index_if_flag.default]) children.push(node.start_index_if_flag.default);
+    } else if (isDialogueNode(node)) {
+      if (node.choices?.length) {
+        node.choices.forEach((choice) => {
+          if (choice.next !== null && scene[choice.next]) children.push(choice.next);
+        });
+      } else if (node.next !== null && scene[node.next]) {
+        children.push(node.next);
       }
     }
+
+    children.forEach((child) => {
+      if (!depth.has(child)) {
+        depth.set(child, (depth.get(current) ?? 0) + 1);
+        queue.push(child);
+      }
+    });
   }
 
   let fallbackDepth = Math.max(-1, ...depth.values()) + 1;
-  sceneNodes.forEach((i) => {
+  scene.forEach((_, i) => {
     if (!depth.has(i)) depth.set(i, fallbackDepth++);
   });
 
-  const rows = new Map<number, number[]>();
-  sceneNodes.forEach((i) => {
-    const level = depth.get(i) ?? 0;
-    rows.set(level, [...(rows.get(level) ?? []), i]);
-  });
+  const rows = new Map<number, number>();
+  const occupied = new Set<string>();
 
-  // First give every scene node a stable position. This provides a fallback
-  // for cycles/disconnected nodes and gives choice rows a prompt position.
-  [...rows.keys()].sort((a, b) => a - b).forEach((level) => {
-    const row = rows.get(level) ?? [];
-    row.sort((a, b) => a - b);
-    row.forEach((sceneIndex, rowIndex) => {
-      positions[sceneId(sceneIndex)] = {
-        x: TREE_PADDING + rowIndex * (NODE_WIDTH + NODE_GAP_X),
-        y: TREE_PADDING + level * 180,
-      };
-    });
-  });
-
-  function placeChoices() {
-    scene.forEach((node, sceneIndex) => {
-      if (!isDialogueNode(node) || !node.choices?.length) return;
-
-      const prompt = positions[sceneId(sceneIndex)];
-      if (!prompt) return;
-
-      const groupWidth = node.choices.length * CHOICE_WIDTH
-        + Math.max(0, node.choices.length - 1) * NODE_GAP_X;
-      let x = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
-      const y = prompt.y + nodeHeight(node) + NODE_GAP_Y;
-
-      node.choices.forEach((_, choiceIndex) => {
-        positions[choiceId(sceneIndex, choiceIndex)] = { x, y };
-        x += CHOICE_WIDTH + NODE_GAP_X;
-      });
-    });
+  function gridKey(column: number, row: number) {
+    return `${column}:${row}`;
   }
 
-  // Repeatedly pull each destination onto the vertical line of the node or
-  // choice that leads to it. Multiple incoming links use their average center.
-  // Repeating also propagates branch alignment through several levels.
-  for (let pass = 0; pass < 4; pass += 1) {
-    placeChoices();
-
-    const desired = new Map<number, number>();
-    scene.forEach((node, sceneIndex) => {
-      const incomingCenters: number[] = [];
-
-      scene.forEach((source, sourceIndex) => {
-        if (isStartRouter(source)) {
-          if (source.start_index_if_flag.default === sceneIndex) {
-            const p = positions[sceneId(sourceIndex)];
-            if (p) incomingCenters.push(p.x + NODE_WIDTH / 2);
-          }
-          return;
-        }
-
-        if (!isDialogueNode(source)) return;
-
-        if (source.choices?.length) {
-          source.choices.forEach((choice, choiceIndex) => {
-            if (choice.next === sceneIndex) {
-              const p = positions[choiceId(sourceIndex, choiceIndex)];
-              if (p) incomingCenters.push(p.x + CHOICE_WIDTH / 2);
-            }
-          });
-        } else if (source.next === sceneIndex) {
-          const p = positions[sceneId(sourceIndex)];
-          if (p) incomingCenters.push(p.x + NODE_WIDTH / 2);
-        }
-      });
-
-      if (incomingCenters.length) {
-        desired.set(
-          sceneIndex,
-          incomingCenters.reduce((sum, value) => sum + value, 0) / incomingCenters.length,
-        );
-      }
-    });
-
-    // Apply desired centers one level at a time while preserving a small,
-    // constant horizontal gap between nodes on the same row.
-    [...rows.keys()].sort((a, b) => a - b).forEach((level) => {
-      const row = (rows.get(level) ?? []).slice().sort((a, b) => {
-        const da = desired.get(a) ?? (positions[sceneId(a)]?.x ?? 0) + NODE_WIDTH / 2;
-        const db = desired.get(b) ?? (positions[sceneId(b)]?.x ?? 0) + NODE_WIDTH / 2;
-        return da - db;
-      });
-
-      let previousRight = TREE_PADDING - NODE_GAP_X;
-      row.forEach((sceneIndex) => {
-        const current = positions[sceneId(sceneIndex)] ?? { x: TREE_PADDING, y: TREE_PADDING };
-        const targetCenter = desired.get(sceneIndex) ?? current.x + NODE_WIDTH / 2;
-        const x = Math.max(targetCenter - NODE_WIDTH / 2, previousRight + NODE_GAP_X);
-        positions[sceneId(sceneIndex)] = { x, y: current.y };
-        previousRight = x + NODE_WIDTH;
-      });
-    });
+  function findFreeRow(column: number, preferred: number) {
+    if (!occupied.has(gridKey(column, preferred))) return preferred;
+    for (let distance = 1; distance < 1000; distance += 1) {
+      const up = preferred - distance;
+      if (up >= 0 && !occupied.has(gridKey(column, up))) return up;
+      const down = preferred + distance;
+      if (!occupied.has(gridKey(column, down))) return down;
+    }
+    return preferred;
   }
 
-  // Rebuild choice positions from the final prompt positions.
-  placeChoices();
+  // Assign rows by following the actual graph. A normal edge keeps the same
+  // row, while a choice gets a dedicated adjacent row for each branch.
+  if (scene.length) rows.set(0, 0);
 
-  // Guarantee every visual has a finite position, even for unusual data.
+  const ordered = [...scene.keys()].sort((a, b) => {
+    const da = depth.get(a) ?? 0;
+    const db = depth.get(b) ?? 0;
+    return da - db || a - b;
+  });
+
+  for (const sceneIndex of ordered) {
+    const node = scene[sceneIndex];
+    const column = depth.get(sceneIndex) ?? 0;
+    const currentRow = rows.get(sceneIndex) ?? 0;
+
+    occupied.add(gridKey(column, currentRow));
+    positions[sceneId(sceneIndex)] = {
+      x: TREE_PADDING + column * COLUMN_GAP,
+      y: TREE_PADDING + currentRow * ROW_GAP,
+    };
+
+    if (isStartRouter(node)) {
+      const next = node.start_index_if_flag.default;
+      if (scene[next] && !rows.has(next)) rows.set(next, currentRow);
+      continue;
+    }
+
+    if (!isDialogueNode(node)) continue;
+
+    if (node.choices?.length) {
+      node.choices.forEach((choice, choiceIndex) => {
+        if (choice.next === null || !scene[choice.next]) return;
+        if (!rows.has(choice.next)) {
+          // Keep branches on predictable grid rows, one row per choice.
+          rows.set(choice.next, currentRow + choiceIndex + 1);
+        }
+      });
+    } else if (node.next !== null && scene[node.next] && !rows.has(node.next)) {
+      rows.set(node.next, currentRow);
+    }
+  }
+
+  // Resolve any rows still missing because of cycles or disconnected nodes.
+  scene.forEach((_, sceneIndex) => {
+    if (!rows.has(sceneIndex)) {
+      const column = depth.get(sceneIndex) ?? 0;
+      rows.set(sceneIndex, findFreeRow(column, sceneIndex));
+    }
+  });
+
+  // Place all scene nodes on exact grid intersections.
+  scene.forEach((_, sceneIndex) => {
+    const column = depth.get(sceneIndex) ?? 0;
+    const row = rows.get(sceneIndex) ?? 0;
+    const finalRow = findFreeRow(column, row);
+    rows.set(sceneIndex, finalRow);
+    occupied.add(gridKey(column, finalRow));
+    positions[sceneId(sceneIndex)] = {
+      x: TREE_PADDING + column * COLUMN_GAP,
+      y: TREE_PADDING + finalRow * ROW_GAP,
+    };
+  });
+
+  // Choices also snap to the same grid. They sit directly under their prompt,
+  // with fixed horizontal slots and no free-form positioning.
+  scene.forEach((node, sceneIndex) => {
+    if (!isDialogueNode(node) || !node.choices?.length) return;
+
+    const prompt = positions[sceneId(sceneIndex)];
+    if (!prompt) return;
+
+    const groupWidth = node.choices.length * CHOICE_WIDTH
+      + Math.max(0, node.choices.length - 1) * CHOICE_GAP;
+    let x = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
+    const row = (rows.get(sceneIndex) ?? 0) + 1;
+    const y = TREE_PADDING + row * ROW_GAP;
+
+    node.choices.forEach((_, choiceIndex) => {
+      positions[choiceId(sceneIndex, choiceIndex)] = { x, y };
+      x += CHOICE_WIDTH + CHOICE_GAP;
+    });
+  });
+
   visuals(scene).forEach((visual, index) => {
     if (!positions[visual.id]) {
       positions[visual.id] = {
-        x: TREE_PADDING + (index % 4) * (NODE_WIDTH + NODE_GAP_X),
-        y: TREE_PADDING + Math.floor(index / 4) * 180,
+        x: TREE_PADDING + (index % 4) * COLUMN_GAP,
+        y: TREE_PADDING + Math.floor(index / 4) * ROW_GAP,
       };
     }
   });
