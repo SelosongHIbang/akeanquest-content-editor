@@ -726,3 +726,16 @@
   .editor-workspace { grid-template-columns: 180px minmax(0, 1fr); }
   .scene-editor-body { grid-template-columns: minmax(0, 1fr) 270px; }
 }
+
+
+/* Graph interaction: dragging the map should never select node text. */
+.scene-graph-canvas,
+.scene-graph-world,
+.scene-graph-node {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.scene-graph-node {
+  -webkit-user-drag: none;
+}
