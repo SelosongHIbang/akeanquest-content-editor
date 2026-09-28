@@ -837,3 +837,45 @@
   color: rgb(228 228 231);
 }
 
+
+
+.file-explorer-scenes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  padding-bottom: 5px;
+}
+
+.file-explorer-add {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgb(63 63 70);
+  border-radius: 5px;
+  background: rgb(24 24 27);
+  color: rgb(212 212 216);
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.file-explorer-add:hover {
+  background: rgb(39 39 42);
+  color: white;
+  border-color: rgb(96 165 250);
+}
+
+.scene-editor-actions .archive-button {
+  color: rgb(248 113 113);
+  border-color: rgb(82 45 45);
+}
+
+.scene-editor-actions button:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
