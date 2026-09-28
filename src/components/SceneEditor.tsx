@@ -96,8 +96,8 @@ function nodeHeight(node: Scene[number], expanded: boolean) {
 
   const textAreaLines = Math.max(3, textLines);
   const editorBaseHeight = node.choices?.length
-    ? 330 + Math.max(0, node.choices.length - 1) * 8
-    : 300;
+    ? 420 + Math.max(0, node.choices.length - 1) * 8
+    : 390;
   return editorBaseHeight + Math.max(0, textAreaLines - 4) * 18;
 }
 
