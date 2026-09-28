@@ -72,10 +72,10 @@ function App() {
   }
 
   function handleAddScene() {
-    if (!selectedScene) return;
+    const chapterId = selectedChapterId;
     const sceneName = prompt("Enter scene name:");
     if (!sceneName) return;
-    const currentChapter = chapters[selectedScene.chapterId];
+    const currentChapter = chapters[chapterId];
     if (currentChapter[sceneName]) { alert("A scene with that name already exists."); return; }
     const newScene: Scene = [
       { type: "start_router", start_index_if_flag: { default: 1 } },
@@ -83,9 +83,23 @@ function App() {
     ];
     setChapters({
       ...chapters,
-      [selectedScene.chapterId]: { ...currentChapter, [sceneName]: newScene },
+      [chapterId]: { ...currentChapter, [sceneName]: newScene },
     });
-    setSelectedScene({ chapterId: selectedScene.chapterId, sceneName });
+    setSelectedScene({ chapterId, sceneName });
+  }
+
+
+  function handleArchiveScene() {
+    if (!selectedScene) return;
+    const currentChapter = chapters[selectedScene.chapterId];
+    if (!currentChapter[selectedScene.sceneName]) return;
+    if (!confirm(`Archive "${selectedScene.sceneName}"?`)) return;
+    const { [selectedScene.sceneName]: _archived, ...remaining } = currentChapter;
+    setChapters({
+      ...chapters,
+      [selectedScene.chapterId]: remaining,
+    });
+    setSelectedScene(null);
   }
 
   const selectedChapter = selectedScene ? chapters[selectedScene.chapterId] : null;
@@ -99,7 +113,7 @@ function App() {
       </header>
 
       <div className="editor-workspace">
-        {activeTab === "scenes" ? (<><Sidebar chapters={chapters} selectedChapterId={selectedChapterId} selectedScene={selectedScene} onChapterChange={(chapterId) => { setSelectedChapterId(chapterId); setSelectedScene(null); }} onSelect={setSelectedScene} /><main className="editor-main">{selectedScene && selectedData ? <SceneEditor key={selectedScene.chapterId + ":" + selectedScene.sceneName} name={selectedScene.sceneName} data={selectedData} onChange={(updatedData) => setChapters({ ...chapters, [selectedScene.chapterId]: { ...chapters[selectedScene.chapterId], [selectedScene.sceneName]: updatedData } })} onAddScene={handleAddScene} onSave={handleSave} /> : <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>}</main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
+        {activeTab === "scenes" ? (<><Sidebar chapters={chapters} selectedChapterId={selectedChapterId} selectedScene={selectedScene} onChapterChange={(chapterId) => { setSelectedChapterId(chapterId); setSelectedScene(null); }} onSelect={setSelectedScene} onAddScene={handleAddScene} /><main className="editor-main"><SceneEditor key={selectedScene ? selectedScene.chapterId + ":" + selectedScene.sceneName : "no-scene"} name={selectedScene?.sceneName ?? "No scene selected"} data={selectedData ?? null} onChange={(updatedData) => { if (!selectedScene) return; setChapters({ ...chapters, [selectedScene.chapterId]: { ...chapters[selectedScene.chapterId], [selectedScene.sceneName]: updatedData } }); }} onSave={handleSave} onArchive={handleArchiveScene} /></main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
       </div>
     </div>
   );
