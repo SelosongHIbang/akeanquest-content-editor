@@ -735,7 +735,7 @@ function SceneEditor({ name, data, onChange }: SceneEditorProps) {
   }
 
   function handleAddNode(index: number) {
-    const newNode: DialogueNodeType = { speaker: "", text: "", next: null };
+    const newNode: DialogueNodeType = { speaker: "", text: "", next: null, word_ids: [] };
     const insertIndex = index + 1;
     const shift = (value: number | null) => value !== null && value >= insertIndex ? value + 1 : value;
 
