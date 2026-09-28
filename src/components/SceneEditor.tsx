@@ -5,10 +5,10 @@ import type { Scene, IdlePool, DialogueNode as DialogueNodeType, Choice, StartRo
 
 type SceneEditorProps = {
   name: string;
-  data: Scene | IdlePool;
+  data: Scene | IdlePool | null;
   onChange: (updatedData: Scene | IdlePool) => void;
-  onAddScene?: () => void;
   onSave?: () => void;
+  onArchive?: () => void;
 };
 
 type Point = { x: number; y: number };
@@ -547,40 +547,43 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
   );
 }
 
-export default function SceneEditor({ name, data, onChange, onAddScene, onSave }: SceneEditorProps) {
-  const [selected, setSelected] = useState<SelectedNode | null>(isScene(data) && data.length ? { kind: "scene", sceneIndex: 0 } : null);
-
-  if (!isScene(data)) return <div className="scene-idle-view"><h2>{name}</h2><pre>{JSON.stringify(data, null, 2)}</pre></div>;
+export default function SceneEditor({ name, data, onChange, onSave, onArchive }: SceneEditorProps) {
+  const [selected, setSelected] = useState<SelectedNode | null>(isScene(data ?? []) && data.length ? { kind: "scene", sceneIndex: 0 } : null);
+  const hasSelection = data !== null;
+  const sceneData = data && isScene(data) ? data : null;
 
   function updateNode(index: number, node: DialogueNodeType | StartRouter) {
-    const next = [...data];
+    if (!sceneData) return;
+    const next = [...sceneData];
     next[index] = node;
     onChange(next);
   }
 
   function addNode(index: number) {
+    if (!sceneData) return;
     const insert = index + 1;
     const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
-    const next = data.map((node): Scene[number] => isDialogueNode(node) ? { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : node);
+    const next = sceneData.map((node): Scene[number] => isDialogueNode(node) ? { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : node);
     next.splice(insert, 0, { speaker: "", text: "", next: null, word_ids: [] });
     onChange(next);
     setSelected({ kind: "scene", sceneIndex: insert });
   }
 
   function duplicateNode(index: number) {
-    const node = data[index];
+    if (!sceneData) return;
+    const node = sceneData[index];
     if (!isDialogueNode(node)) return;
     const insert = index + 1;
     const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
-    const next = data.map((item): Scene[number] => isDialogueNode(item) ? { ...item, next: shift(item.next), choices: item.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : item);
+    const next = sceneData.map((item): Scene[number] => isDialogueNode(item) ? { ...item, next: shift(item.next), choices: item.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : item);
     next.splice(insert, 0, { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) });
     onChange(next);
     setSelected({ kind: "scene", sceneIndex: insert });
   }
 
   function deleteNode(index: number) {
-    if (!isDialogueNode(data[index])) return;
-    const next = data.filter((_, i) => i !== index).map((node): Scene[number] => {
+    if (!sceneData || !isDialogueNode(sceneData[index])) return;
+    const next = sceneData.filter((_, i) => i !== index).map((node): Scene[number] => {
       if (!isDialogueNode(node)) return node;
       const fix = (v: number | null) => v === index ? null : v !== null && v > index ? v - 1 : v;
       return { ...node, next: fix(node.next), choices: node.choices?.map((c) => ({ ...c, next: fix(c.next) })) };
@@ -591,11 +594,29 @@ export default function SceneEditor({ name, data, onChange, onAddScene, onSave }
 
   return (
     <div className="scene-editor-shell">
-      <div className="scene-editor-titlebar"><div><strong>{name}</strong><span>{data.length} nodes</span><span className="save-status">● Draft saved locally</span></div><div className="scene-editor-actions"><button type="button" onClick={onAddScene}>+ Scene</button><button type="button" className="save-button" onClick={onSave}>Save JSON</button></div></div>
-      <div className="scene-editor-body">
-        <SceneMap scene={data} selected={selected} onSelect={setSelected} />
-        <SceneInspector scene={data} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} />
+      <div className="scene-editor-titlebar">
+        <div>
+          <strong>{name}</strong>
+          {sceneData ? <span>{sceneData.length} nodes</span> : data ? <span>Idle pool</span> : <span>No scene selected</span>}
+          {hasSelection && <span className="save-status">● Draft saved locally</span>}
+        </div>
+        <div className="scene-editor-actions">
+          <button type="button" onClick={onSave} disabled={!hasSelection}>Save JSON</button>
+          <button type="button" className="archive-button" onClick={onArchive} disabled={!sceneData}>Archive Scene</button>
+        </div>
       </div>
+      {!data ? (
+        <div className="editor-empty"><strong>Select a scene</strong><span>Choose a scene from the explorer to open its node tree.</span></div>
+      ) : !sceneData ? (
+        <div className="scene-editor-body"><div className="scene-idle-view"><h2>{name}</h2><pre>{JSON.stringify(data, null, 2)}</pre></div></div>
+      ) : (
+        <div className="scene-editor-body">
+          <SceneMap scene={sceneData} selected={selected} onSelect={setSelected} />
+          <SceneInspector scene={sceneData} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} />
+        </div>
+      )}
     </div>
   );
 }
+
+export default SceneEditor;
