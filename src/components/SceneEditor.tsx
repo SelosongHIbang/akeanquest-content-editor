@@ -619,4 +619,3 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive }:
   );
 }
 
-export default SceneEditor;
