@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "content:sync": "node scripts/auto-push-content.mjs"
+    "content:sync": "node scripts/auto-push-content.mjs",
+    "dev:lan": "vite --host"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
