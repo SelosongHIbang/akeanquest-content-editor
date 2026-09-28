@@ -4,7 +4,9 @@ type SelectedScene = { chapterId: string; sceneName: string } | null;
 
 type SidebarProps = {
   chapters: Record<string, Chapter>;
+  selectedChapterId: string;
   selectedScene: SelectedScene;
+  onChapterChange: (chapterId: string) => void;
   onSelect: (scene: SelectedScene) => void;
 };
 
@@ -12,23 +14,30 @@ function chapterLabel(id: string) {
   return id.replace("chapter", "Chapter ");
 }
 
-export default function Sidebar({ chapters, selectedScene, onSelect }: SidebarProps) {
+export default function Sidebar({ chapters, selectedChapterId, selectedScene, onChapterChange, onSelect }: SidebarProps) {
+  const chapter = chapters[selectedChapterId];
+
   return (
     <aside className="file-explorer">
-      <div className="file-explorer-header"><span>EXPLORER</span><strong>Chapters</strong></div>
+      <div className="file-explorer-header"><span>EXPLORER</span><strong>Chapter</strong></div>
+      <div className="file-explorer-section">
+        <select
+          aria-label="Select chapter"
+          value={selectedChapterId}
+          onChange={(event) => onChapterChange(event.target.value)}
+        >
+          {Object.keys(chapters).map((chapterId) => (
+            <option key={chapterId} value={chapterId}>{chapterLabel(chapterId)}</option>
+          ))}
+        </select>
+      </div>
       <div className="file-explorer-section"><span>SCENES</span></div>
       <nav className="file-explorer-list">
-        {Object.entries(chapters).map(([chapterId, chapter]) => (
-          <div key={chapterId} className="file-explorer-group">
-            <div className="file-explorer-group-header">{chapterLabel(chapterId)}</div>
-            {Object.keys(chapter).map((item) => (
-              <button key={item} type="button" onClick={() => onSelect({ chapterId, sceneName: item })} className={selectedScene?.chapterId === chapterId && selectedScene.sceneName === item ? "selected" : ""}>
-                <span className="file-icon">◆</span><span>{item}</span>
-              </button>
-            ))}
-          </div>
+        {chapter && Object.keys(chapter).map((item) => (
+          <button key={item} type="button" onClick={() => onSelect({ chapterId: selectedChapterId, sceneName: item })} className={selectedScene?.chapterId === selectedChapterId && selectedScene.sceneName === item ? "selected" : ""}>
+            <span className="file-icon">◆</span><span>{item}</span>
+          </button>
         ))}
       </nav>
     </aside>
   );
-}
