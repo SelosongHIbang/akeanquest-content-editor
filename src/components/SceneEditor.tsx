@@ -80,142 +80,104 @@ function edges(scene: Scene): Edge[] {
 }
 
 function autoLayout(scene: Scene): Record<string, Point> {
-  const nodes = visuals(scene);
-  const links = edges(scene);
-  const children = new Map<string, string[]>();
-  const parents = new Map<string, string[]>();
-  links.forEach((edge) => {
-    children.set(edge.from, [...(children.get(edge.from) ?? []), edge.to]);
-    parents.set(edge.to, [...(parents.get(edge.to) ?? []), edge.from]);
+  const positions: Record<string, Point> = {};
+  const sceneNodes = scene.map((_, i) => i);
+
+  // Build normal dialogue/start-node links. Choice destinations are treated as
+  // one extra tree level so the choice row always belongs visually to its prompt.
+  const nextChildren = new Map<number, number[]>();
+  scene.forEach((node, i) => {
+    if (isStartRouter(node)) {
+      const next = node.start_index_if_flag.default;
+      if (scene[next]) nextChildren.set(i, [next]);
+    } else if (isDialogueNode(node) && !node.choices?.length && node.next !== null && scene[node.next]) {
+      nextChildren.set(i, [node.next]);
+    } else if (isDialogueNode(node) && node.choices?.length) {
+      const destinations = node.choices
+        .map((choice) => choice.next)
+        .filter((next): next is number => next !== null && !!scene[next]);
+      if (destinations.length) nextChildren.set(i, destinations);
+    }
   });
 
-  const root = scene.length ? sceneId(0) : undefined;
-  const levels = new Map<string, number>();
-  if (root) levels.set(root, 0);
-  const queue = root ? [root] : [];
+  const depth = new Map<number, number>();
+  if (scene.length) depth.set(0, 0);
+  const queue = scene.length ? [0] : [];
   while (queue.length) {
     const current = queue.shift()!;
-    for (const child of children.get(current) ?? []) {
-      if (!levels.has(child)) {
-        levels.set(child, (levels.get(current) ?? 0) + 1);
+    for (const child of nextChildren.get(current) ?? []) {
+      const nextDepth = (depth.get(current) ?? 0) + 1;
+      if (!depth.has(child) || nextDepth < depth.get(child)!) {
+        depth.set(child, nextDepth);
         queue.push(child);
       }
     }
   }
 
-  let fallback = Math.max(-1, ...levels.values()) + 1;
-  nodes.forEach((node) => { if (!levels.has(node.id)) levels.set(node.id, fallback++); });
-
-  const byLevel = new Map<number, Visual[]>();
-  nodes.forEach((node) => {
-    const level = levels.get(node.id) ?? 0;
-    byLevel.set(level, [...(byLevel.get(level) ?? []), node]);
+  let fallbackDepth = Math.max(-1, ...depth.values()) + 1;
+  sceneNodes.forEach((i) => {
+    if (!depth.has(i)) depth.set(i, fallbackDepth++);
   });
 
-  const positions: Record<string, Point> = {};
+  const rows = new Map<number, number[]>();
+  sceneNodes.forEach((i) => {
+    const level = depth.get(i) ?? 0;
+    rows.set(level, [...(rows.get(level) ?? []), i]);
+  });
 
-  [...byLevel.keys()].sort((a, b) => a - b).forEach((level) => {
-    const row = byLevel.get(level) ?? [];
-    const normalNodes = row.filter((node) => node.kind !== "choice");
-    const choiceNodes = row.filter((node) => node.kind === "choice");
-
-    // Lay normal nodes out first, preserving the existing tree order.
-    normalNodes.sort((a, b) => {
-      const ax = (parents.get(a.id) ?? []).reduce((sum, id) => sum + (positions[id]?.x ?? 0), 0);
-      const bx = (parents.get(b.id) ?? []).reduce((sum, id) => sum + (positions[id]?.x ?? 0), 0);
-      return ax - bx || a.sceneIndex - b.sceneIndex;
-    });
+  // Lay the actual scene nodes out as a conventional tree.
+  const sortedLevels = [...rows.keys()].sort((a, b) => a - b);
+  sortedLevels.forEach((level) => {
+    const row = rows.get(level) ?? [];
+    row.sort((a, b) => a - b);
 
     let x = TREE_PADDING;
-    normalNodes.forEach((node) => {
+    row.forEach((sceneIndex) => {
+      const node = scene[sceneIndex];
       const width = NODE_WIDTH;
-      const parentXs = (parents.get(node.id) ?? []).map((id) => positions[id]?.x).filter((v): v is number => v !== undefined);
-      const preferred = parentXs.length ? parentXs.reduce((a, b) => a + b, 0) / parentXs.length : x;
+      const parentCandidates = sceneNodes
+        .filter((parentIndex) => (nextChildren.get(parentIndex) ?? []).includes(sceneIndex))
+        .map((parentIndex) => positions[sceneId(parentIndex)]?.x)
+        .filter((value): value is number => value !== undefined);
+
+      const preferred = parentCandidates.length
+        ? parentCandidates.reduce((sum, value) => sum + value, 0) / parentCandidates.length
+        : x;
+
       x = Math.max(x, preferred - width / 2);
-      positions[node.id] = { x, y: 0 };
+      positions[sceneId(sceneIndex)] = { x, y: TREE_PADDING + level * 180 };
       x += width + NODE_GAP_X;
     });
-
-    // Choices are always a single horizontal row directly underneath their prompt.
-    const groupedChoices = new Map<number, Visual[]>();
-    choiceNodes.forEach((choice) => {
-      const group = groupedChoices.get(choice.sceneIndex) ?? [];
-      group.push(choice);
-      groupedChoices.set(choice.sceneIndex, group);
-    });
-
-    for (const [promptIndex, choices] of groupedChoices) {
-      const prompt = positions[sceneId(promptIndex)];
-      if (!prompt) continue;
-      choices.sort((a, b) => (a.choiceIndex ?? 0) - (b.choiceIndex ?? 0));
-      const groupWidth = choices.length * CHOICE_WIDTH + Math.max(0, choices.length - 1) * NODE_GAP_X;
-      let choiceX = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
-
-      choices.forEach((choice) => {
-        positions[choice.id] = { x: choiceX, y: 0 };
-        choiceX += CHOICE_WIDTH + NODE_GAP_X;
-      });
-    }
-
-    // If multiple rows share a level, push overlapping nodes/groups apart while
-    // keeping each prompt's choice group together.
-    const occupied = row
-      .filter((node) => positions[node.id])
-      .sort((a, b) => positions[a.id].x - positions[b.id].x);
-
-    for (let i = 1; i < occupied.length; i += 1) {
-      const previous = occupied[i - 1];
-      const current = occupied[i];
-      const previousWidth = previous.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
-      const requiredX = positions[previous.id].x + previousWidth + NODE_GAP_X;
-      if (positions[current.id].x < requiredX) {
-        const delta = requiredX - positions[current.id].x;
-        positions[current.id].x += delta;
-      }
-    }
   });
 
-  // Re-center choice groups after collision resolution so their row remains
-  // visually tied to the prompt instead of drifting independently.
+  // Choices are always rendered, in source order, as one horizontal row
+  // centered under their prompt. They never participate in normal node packing.
   scene.forEach((node, sceneIndex) => {
     if (!isDialogueNode(node) || !node.choices?.length) return;
+
     const prompt = positions[sceneId(sceneIndex)];
     if (!prompt) return;
-    const choiceVisuals = node.choices.map((_, choiceIndex) => choiceId(sceneIndex, choiceIndex));
-    const first = positions[choiceVisuals[0]];
-    const last = positions[choiceVisuals[choiceVisuals.length - 1]];
-    if (!first || !last) return;
-    const groupWidth = node.choices.length * CHOICE_WIDTH + Math.max(0, node.choices.length - 1) * NODE_GAP_X;
-    const targetStart = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
-    const delta = targetStart - first.x;
-    choiceVisuals.forEach((id) => { if (positions[id]) positions[id].x += delta; });
-  });
 
-  let y = TREE_PADDING;
-  [...byLevel.keys()].sort((a, b) => a - b).forEach((level) => {
-    const row = byLevel.get(level) ?? [];
-    const h = Math.max(
-      ...row.map((node) =>
-        node.kind === "choice"
-          ? choiceHeight(scene[node.sceneIndex].choices![node.choiceIndex!])
-          : nodeHeight(scene[node.sceneIndex])
-      )
-    );
-    row.forEach((node) => { positions[node.id].y = y; });
-    y += h + NODE_GAP_Y;
-  });
+    const groupWidth = node.choices.length * CHOICE_WIDTH
+      + Math.max(0, node.choices.length - 1) * NODE_GAP_X;
+    let x = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
+    const y = prompt.y + nodeHeight(node) + NODE_GAP_Y;
 
-  // Make the choice row sit immediately below its prompt.
-  scene.forEach((node, sceneIndex) => {
-    if (!isDialogueNode(node) || !node.choices?.length) return;
-    const prompt = positions[sceneId(sceneIndex)];
-    if (!prompt) return;
-    const promptHeight = nodeHeight(node);
-    const choiceY = prompt.y + promptHeight + NODE_GAP_Y;
     node.choices.forEach((_, choiceIndex) => {
-      const id = choiceId(sceneIndex, choiceIndex);
-      if (positions[id]) positions[id].y = choiceY;
+      positions[choiceId(sceneIndex, choiceIndex)] = { x, y };
+      x += CHOICE_WIDTH + NODE_GAP_X;
     });
+  });
+
+  // Guarantee every visual has a finite position, even for disconnected/cyclic
+  // content or unusual data.
+  visuals(scene).forEach((visual, index) => {
+    if (!positions[visual.id]) {
+      positions[visual.id] = {
+        x: TREE_PADDING + (index % 4) * (NODE_WIDTH + NODE_GAP_X),
+        y: TREE_PADDING + Math.floor(index / 4) * 180,
+      };
+    }
   });
 
   return positions;
@@ -320,14 +282,17 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
   function panStart(e: React.PointerEvent) {
     didPanRef.current = false;
     setPanning({ start: point(e), origin: offset });
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
   function panMove(e: React.PointerEvent) {
     if (!panning) return;
     const p = point(e);
     const dx = p.x - panning.start.x;
     const dy = p.y - panning.start.y;
-    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didPanRef.current = true;
+    if (!didPanRef.current && Math.abs(dx) <= 8 && Math.abs(dy) <= 8) return;
+    if (!didPanRef.current) {
+      didPanRef.current = true;
+      (canvasRef.current ?? e.currentTarget).setPointerCapture(e.pointerId);
+    }
     setOffset({ x: panning.origin.x + dx, y: panning.origin.y + dy });
   }
   function zoom(delta: number) { setScale((v) => Math.min(1.5, Math.max(0.5, Number((v + delta).toFixed(2))))); }
