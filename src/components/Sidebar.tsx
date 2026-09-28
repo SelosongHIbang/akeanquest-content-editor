@@ -19,9 +19,9 @@ export default function Sidebar({ chapters, selectedChapterId, selectedScene, on
 
   return (
     <aside className="file-explorer">
-      <div className="file-explorer-header"><span>EXPLORER</span><strong>Chapter</strong></div>
       <div className="file-explorer-section">
         <select
+          className="chapter-select"
           aria-label="Select chapter"
           value={selectedChapterId}
           onChange={(event) => onChapterChange(event.target.value)}
