@@ -13,7 +13,16 @@ function App() {
   const [content, setContent] = useState<Chapter>(() => {
     const saved = localStorage.getItem("akeanquest-content-draft");
     if (saved) {
-      try { return JSON.parse(saved) as Chapter; } catch { localStorage.removeItem("akeanquest-content-draft"); }
+      try {
+        const parsed = JSON.parse(saved) as Chapter;
+        // Never let an empty/corrupt local draft replace the bundled scene tree.
+        // This keeps the node graph recoverable after an interrupted edit or
+        // stale localStorage state.
+        if (parsed && typeof parsed === "object" && Object.keys(parsed).length > 0) {
+          return parsed;
+        }
+      } catch {}
+      localStorage.removeItem("akeanquest-content-draft");
     }
     return chapter1 as Chapter;
   });
