@@ -102,6 +102,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
       }
     }
   }
+
   let fallback = Math.max(-1, ...levels.values()) + 1;
   nodes.forEach((node) => { if (!levels.has(node.id)) levels.set(node.id, fallback++); });
 
@@ -112,34 +113,113 @@ function autoLayout(scene: Scene): Record<string, Point> {
   });
 
   const positions: Record<string, Point> = {};
+
   [...byLevel.keys()].sort((a, b) => a - b).forEach((level) => {
     const row = byLevel.get(level) ?? [];
-    row.sort((a, b) => {
+    const normalNodes = row.filter((node) => node.kind !== "choice");
+    const choiceNodes = row.filter((node) => node.kind === "choice");
+
+    // Lay normal nodes out first, preserving the existing tree order.
+    normalNodes.sort((a, b) => {
       const ax = (parents.get(a.id) ?? []).reduce((sum, id) => sum + (positions[id]?.x ?? 0), 0);
       const bx = (parents.get(b.id) ?? []).reduce((sum, id) => sum + (positions[id]?.x ?? 0), 0);
-      return ax - bx || a.sceneIndex - b.sceneIndex || (a.choiceIndex ?? -1) - (b.choiceIndex ?? -1);
+      return ax - bx || a.sceneIndex - b.sceneIndex;
     });
+
     let x = TREE_PADDING;
-    row.forEach((node) => {
-      const width = node.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+    normalNodes.forEach((node) => {
+      const width = NODE_WIDTH;
       const parentXs = (parents.get(node.id) ?? []).map((id) => positions[id]?.x).filter((v): v is number => v !== undefined);
       const preferred = parentXs.length ? parentXs.reduce((a, b) => a + b, 0) / parentXs.length : x;
       x = Math.max(x, preferred - width / 2);
       positions[node.id] = { x, y: 0 };
       x += width + NODE_GAP_X;
     });
+
+    // Choices are always a single horizontal row directly underneath their prompt.
+    const groupedChoices = new Map<number, Visual[]>();
+    choiceNodes.forEach((choice) => {
+      const group = groupedChoices.get(choice.sceneIndex) ?? [];
+      group.push(choice);
+      groupedChoices.set(choice.sceneIndex, group);
+    });
+
+    for (const [promptIndex, choices] of groupedChoices) {
+      const prompt = positions[sceneId(promptIndex)];
+      if (!prompt) continue;
+      choices.sort((a, b) => (a.choiceIndex ?? 0) - (b.choiceIndex ?? 0));
+      const groupWidth = choices.length * CHOICE_WIDTH + Math.max(0, choices.length - 1) * NODE_GAP_X;
+      let choiceX = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
+
+      choices.forEach((choice) => {
+        positions[choice.id] = { x: choiceX, y: 0 };
+        choiceX += CHOICE_WIDTH + NODE_GAP_X;
+      });
+    }
+
+    // If multiple rows share a level, push overlapping nodes/groups apart while
+    // keeping each prompt's choice group together.
+    const occupied = row
+      .filter((node) => positions[node.id])
+      .sort((a, b) => positions[a.id].x - positions[b.id].x);
+
+    for (let i = 1; i < occupied.length; i += 1) {
+      const previous = occupied[i - 1];
+      const current = occupied[i];
+      const previousWidth = previous.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
+      const requiredX = positions[previous.id].x + previousWidth + NODE_GAP_X;
+      if (positions[current.id].x < requiredX) {
+        const delta = requiredX - positions[current.id].x;
+        positions[current.id].x += delta;
+      }
+    }
+  });
+
+  // Re-center choice groups after collision resolution so their row remains
+  // visually tied to the prompt instead of drifting independently.
+  scene.forEach((node, sceneIndex) => {
+    if (!isDialogueNode(node) || !node.choices?.length) return;
+    const prompt = positions[sceneId(sceneIndex)];
+    if (!prompt) return;
+    const choiceVisuals = node.choices.map((_, choiceIndex) => choiceId(sceneIndex, choiceIndex));
+    const first = positions[choiceVisuals[0]];
+    const last = positions[choiceVisuals[choiceVisuals.length - 1]];
+    if (!first || !last) return;
+    const groupWidth = node.choices.length * CHOICE_WIDTH + Math.max(0, node.choices.length - 1) * NODE_GAP_X;
+    const targetStart = prompt.x + NODE_WIDTH / 2 - groupWidth / 2;
+    const delta = targetStart - first.x;
+    choiceVisuals.forEach((id) => { if (positions[id]) positions[id].x += delta; });
   });
 
   let y = TREE_PADDING;
   [...byLevel.keys()].sort((a, b) => a - b).forEach((level) => {
     const row = byLevel.get(level) ?? [];
-    const h = Math.max(...row.map((node) => node.kind === "choice" ? choiceHeight(scene[node.sceneIndex].choices![node.choiceIndex!]) : nodeHeight(scene[node.sceneIndex])));
+    const h = Math.max(
+      ...row.map((node) =>
+        node.kind === "choice"
+          ? choiceHeight(scene[node.sceneIndex].choices![node.choiceIndex!])
+          : nodeHeight(scene[node.sceneIndex])
+      )
+    );
     row.forEach((node) => { positions[node.id].y = y; });
     y += h + NODE_GAP_Y;
   });
+
+  // Make the choice row sit immediately below its prompt.
+  scene.forEach((node, sceneIndex) => {
+    if (!isDialogueNode(node) || !node.choices?.length) return;
+    const prompt = positions[sceneId(sceneIndex)];
+    if (!prompt) return;
+    const promptHeight = nodeHeight(node);
+    const choiceY = prompt.y + promptHeight + NODE_GAP_Y;
+    node.choices.forEach((_, choiceIndex) => {
+      const id = choiceId(sceneIndex, choiceIndex);
+      if (positions[id]) positions[id].y = choiceY;
+    });
+  });
+
   return positions;
 }
-
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return <label className="scene-inspector-field"><span>{label}</span>{children}</label>;
 }
@@ -227,6 +307,7 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
   const [scale, setScale] = useState(0.9);
   const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
   const [panning, setPanning] = useState<{ start: Point; origin: Point } | null>(null);
+  const didPanRef = useRef(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const layout = useMemo(() => autoLayout(scene), [scene]);
 
@@ -237,14 +318,17 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
     return rect ? { x: e.clientX - rect.left, y: e.clientY - rect.top } : { x: 0, y: 0 };
   }
   function panStart(e: React.PointerEvent) {
-    if ((e.target as HTMLElement).closest("[data-node]")) return;
+    didPanRef.current = false;
     setPanning({ start: point(e), origin: offset });
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   }
   function panMove(e: React.PointerEvent) {
     if (!panning) return;
     const p = point(e);
-    setOffset({ x: panning.origin.x + p.x - panning.start.x, y: panning.origin.y + p.y - panning.start.y });
+    const dx = p.x - panning.start.x;
+    const dy = p.y - panning.start.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didPanRef.current = true;
+    setOffset({ x: panning.origin.x + dx, y: panning.origin.y + dy });
   }
   function zoom(delta: number) { setScale((v) => Math.min(1.5, Math.max(0.5, Number((v + delta).toFixed(2))))); }
 
@@ -283,7 +367,14 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
             const source = scene[visual.sceneIndex];
             const label = visual.kind === "choice" && isDialogueNode(source) ? source.choices![visual.choiceIndex!].label : title(source, visual.sceneIndex);
             return (
-              <button key={visual.id} type="button" data-node className={`scene-graph-node ${visual.kind} ${isSelected ? "selected" : ""}`} style={{ left: p.x, top: p.y, width }} onClick={(e) => { e.stopPropagation(); onSelect(visual.kind === "choice" ? { kind: "choice", sceneIndex: visual.sceneIndex, choiceIndex: visual.choiceIndex! } : { kind: "scene", sceneIndex: visual.sceneIndex }); }}>
+              <button key={visual.id} type="button" data-node className={`scene-graph-node ${visual.kind} ${isSelected ? "selected" : ""}`} style={{ left: p.x, top: p.y, width }} onClick={(e) => {
+                e.stopPropagation();
+                if (didPanRef.current) {
+                  didPanRef.current = false;
+                  return;
+                }
+                onSelect(visual.kind === "choice" ? { kind: "choice", sceneIndex: visual.sceneIndex, choiceIndex: visual.choiceIndex! } : { kind: "scene", sceneIndex: visual.sceneIndex });
+              }}>
                 <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
                 <strong>{visual.kind === "choice" ? label || "Empty choice" : label}</strong>
                 <small>{visual.kind === "choice" ? `→ ${source && isDialogueNode(source) && source.choices?.[visual.choiceIndex!]?.next !== null ? `Node #${source.choices![visual.choiceIndex!].next}` : "End"}` : `#${visual.sceneIndex}`}</small>
