@@ -14,8 +14,6 @@ type WordBank = { words: WordEntry[] };
 type Chapters = Record<string, Chapter>;
 type SelectedScene = { chapterId: string; sceneName: string } | null;
 
-type UnknownRecord = Record<string, unknown>;
-
 import Sidebar from "./components/Sidebar";
 import SceneEditor from "./components/SceneEditor";
 
@@ -34,46 +32,48 @@ function App() {
   const [selectedScene, setSelectedScene] = useState<SelectedScene>(null);
   const [activeTab, setActiveTab] = useState<"scenes" | "word-bank">("scenes");
   const [wordBank, setWordBank] = useState<WordBank>(() => wordBankData as WordBank);
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveGeneration = useRef(0);
+  const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const previousChapters = useRef<Chapters | null>(null);
+  const previousWordBank = useRef<WordBank | null>(null);
 
-  useEffect(() => {
-    saveGeneration.current += 1;
-    const generation = saveGeneration.current;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
+  function queueAutosave(fileName: string, content: unknown) {
+    const existing = saveTimers.current[fileName];
+    if (existing) clearTimeout(existing);
 
-    saveTimer.current = setTimeout(async () => {
+    saveTimers.current[fileName] = setTimeout(async () => {
       try {
-        await Promise.all([
-          ...Object.entries(chapters).map(([chapterId, content]) =>
-            fetch(`/__akeanquest/save/${chapterId}.json`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(content, null, 2),
-            }).then(async (response) => {
-              if (!response.ok) throw new Error(await response.text());
-            })
-          ),
-          fetch("/__akeanquest/save/word_bank.json", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(wordBank, null, 2),
-          }).then(async (response) => {
-            if (!response.ok) throw new Error(await response.text());
-          }),
-        ]);
-        if (generation === saveGeneration.current) {
-          console.info("[AkeanQuest] Content autosaved to src/data.");
-        }
+        const response = await fetch(`/__akeanquest/save/${fileName}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(content, null, 2),
+        });
+        if (!response.ok) throw new Error(await response.text());
+        console.info(`[AkeanQuest] Autosaved src/data/${fileName}`);
       } catch (error) {
-        console.error("[AkeanQuest] Autosave failed:", error);
+        console.error(`[AkeanQuest] Autosave failed for ${fileName}:`, error);
+      } finally {
+        delete saveTimers.current[fileName];
       }
     }, 700);
+  }
 
-    return () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    };
-  }, [chapters, wordBank]);
+  useEffect(() => {
+    if (previousChapters.current) {
+      for (const [chapterId, content] of Object.entries(chapters)) {
+        if (previousChapters.current[chapterId] !== content) {
+          queueAutosave(`${chapterId}.json`, content);
+        }
+      }
+    }
+    previousChapters.current = chapters;
+  }, [chapters]);
+
+  useEffect(() => {
+    if (previousWordBank.current && previousWordBank.current !== wordBank) {
+      queueAutosave("word_bank.json", wordBank);
+    }
+    previousWordBank.current = wordBank;
+  }, [wordBank]);
 
   function handleSave() {
     if (!selectedScene) return;
