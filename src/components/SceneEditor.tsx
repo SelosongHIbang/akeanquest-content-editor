@@ -540,6 +540,25 @@ function SceneMap({
                 placeholder={choices.length ? "What should the player be asked?" : "Enter dialogue..."}
               />
             </label>
+            <label>
+              <span>Word IDs</span>
+              <textarea
+                value={(node.word_ids ?? []).join("\n")}
+                onChange={(event) =>
+                  updateDialogueField(
+                    index,
+                    "word_ids",
+                    event.target.value
+                      .split(/[,\n]/)
+                      .map((id) => id.trim())
+                      .filter(Boolean),
+                  )
+                }
+                rows={2}
+                placeholder={"w128\nw129"}
+              />
+              <small className="scene-map-help">One word ID per line or comma-separated.</small>
+            </label>
             {choices.length > 0 ? (
               <div className="scene-choice-branches">
                 <div className="scene-choice-title">
@@ -776,7 +795,7 @@ function SceneEditor({ name, data, onChange }: SceneEditorProps) {
   }
 
   function handleAddNode(index: number) {
-    const newNode: DialogueNodeType = { speaker: "", text: "", next: null };
+    const newNode: DialogueNodeType = { speaker: "", text: "", next: null, word_ids: [] };
     const insertIndex = index + 1;
     const shift = (value: number | null) => value !== null && value >= insertIndex ? value + 1 : value;
 
