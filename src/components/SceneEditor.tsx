@@ -172,6 +172,21 @@ function autoLayout(scene: Scene): Record<string, Point> {
     };
   });
 
+  // Ordinary dialogue -> dialogue remains a straight horizontal chain.
+  scene.forEach((node, sceneIndex) => {
+    if (!isDialogueNode(node) || node.choices?.length || node.next === null || !scene[node.next]) return;
+
+    const source = positions[sceneId(sceneIndex)];
+    const target = positions[sceneId(node.next)];
+    if (!source || !target) return;
+
+    positions[sceneId(node.next)] = {
+      x: Math.max(target.x, source.x + STEP_X),
+      y: source.y,
+    };
+  });
+
+
   // Choices occupy the fixed column immediately after the prompt.
   // Every choice uses the same X and only its grid row changes.
   scene.forEach((node, sceneIndex) => {
@@ -199,20 +214,6 @@ function autoLayout(scene: Scene): Record<string, Point> {
         }
       }
     });
-  });
-
-  // Ordinary dialogue -> dialogue remains a straight horizontal chain.
-  scene.forEach((node, sceneIndex) => {
-    if (!isDialogueNode(node) || node.choices?.length || node.next === null || !scene[node.next]) return;
-
-    const source = positions[sceneId(sceneIndex)];
-    const target = positions[sceneId(node.next)];
-    if (!source || !target) return;
-
-    positions[sceneId(node.next)] = {
-      x: Math.max(target.x, source.x + STEP_X),
-      y: source.y,
-    };
   });
 
   visuals(scene).forEach((visual, index) => {
