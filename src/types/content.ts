@@ -8,7 +8,8 @@ export type PhraseBuilderNode = {
   prompt: string;
   choices: string[];
   answer: string[];
-  next: number | null;
+  success: number | null;
+  failure: number | null;
   translation?: string;
 };
 
@@ -26,7 +27,6 @@ export type DialogueNode = {
 export type StartRouter = {
   type: "start_router";
   start_index_if_flag: Record<string, number>;
-  type: string;
 };
 
 export type Scene = Array<StartRouter | DialogueNode | PhraseBuilderNode>;
