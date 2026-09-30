@@ -741,7 +741,7 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
             const source = scene[visual.sceneIndex];
             const label = visual.kind === "choice" && isDialogueNode(source) ? source.choices![visual.choiceIndex!].label : title(source, visual.sceneIndex);
             return (
-              <button key={visual.id} type="button" data-node className={`scene-graph-node ${visual.kind} ${isSelected ? "selected" : ""}`} style={{ left: p.x, top: p.y, width }} onClick={(e) => {
+              <button key={visual.id} type="button" data-node className={`scene-graph-node ${visual.kind} ${visual.kind === "choice" ? "type-choice" : isStartRouter(source) ? "type-start" : isPhraseBuilderNode(source) ? "type-phrase" : isDialogueNode(source) && source.choices?.length ? "type-prompt" : "type-dialogue"} ${isSelected ? "selected" : ""}`} style={{ left: p.x, top: p.y, width }} onClick={(e) => {
                 e.stopPropagation();
                 if (didPanRef.current) {
                   didPanRef.current = false;
