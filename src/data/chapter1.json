@@ -141,10 +141,10 @@
       "type": "phrase_builder",
       "prompt": "Can you repeat it?",
       "choices": [
-        "mayad",
-        "ikaw/ka",
         "agahon",
-        "nga"
+        "mayad",
+        "nga",
+        "ikaw/ka"
       ],
       "answer": [
         "mayad",
