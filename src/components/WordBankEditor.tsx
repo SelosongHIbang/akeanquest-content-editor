@@ -7,6 +7,8 @@ export default function WordBankEditor({data,onChange}:{data:WordBank;onChange:(
  const [query,setQuery]=useState("");
  const [selectedId,setSelectedId]=useState<string|null>(data.words[0]?.id??null);
  const [collapsed,setCollapsed]=useState<Set<string>>(new Set());
+ const [categoryQuery,setCategoryQuery]=useState("");
+ const [categoryOpen,setCategoryOpen]=useState(false);
 
  const matches=useMemo(()=>{
   const q=query.trim().toLocaleLowerCase();
@@ -25,6 +27,12 @@ export default function WordBankEditor({data,onChange}:{data:WordBank;onChange:(
  },[matches]);
 
  const selected=data.words.find(w=>w.id===selectedId)??null;
+
+ const categorySuggestions=useMemo(()=>{
+  const q=categoryQuery.trim().toLocaleLowerCase();
+  const categories=[...new Set(data.words.map(w=>w.category.trim()).filter(Boolean))];
+  return categories.filter(category=>!q||category.toLocaleLowerCase().includes(q)).slice(0,20);
+ },[data.words,categoryQuery]);
 
  function update(patch:Partial<WordEntry>){
   if(!selected)return;
@@ -86,7 +94,7 @@ export default function WordBankEditor({data,onChange}:{data:WordBank;onChange:(
     </div>
    </section>
    <section className="word-bank-form">{selected?<><div className="word-bank-form-title"><span>{selected.id}</span><strong>{selected.akeanon||"New word"}</strong></div>
-    <label>ID<input value={selected.id} onChange={e=>update({id:e.target.value.trim()})}/></label><label>Akeanon<input value={selected.akeanon} onChange={e=>update({akeanon:e.target.value})}/></label><label>Gloss<input value={selected.gloss} onChange={e=>update({gloss:e.target.value})}/></label><label>Category<input value={selected.category} onChange={e=>update({category:e.target.value})}/></label><label>Area<select value={selected.area} onChange={e=>update({area:e.target.value})}>{["chapter1","chapter2","chapter3","chapter4","chapter5","chapter6"].map(x=><option key={x}>{x}</option>)}</select></label><label>Source<input value={selected.source} onChange={e=>update({source:e.target.value})}/></label><label className="word-bank-checkbox"><input type="checkbox" checked={selected.verified} onChange={e=>update({verified:e.target.checked})}/> Verified</label>
+    <label>ID<input value={selected.id} onChange={e=>update({id:e.target.value.trim()})}/></label><label>Akeanon<input value={selected.akeanon} onChange={e=>update({akeanon:e.target.value})}/></label><label>Gloss<input value={selected.gloss} onChange={e=>update({gloss:e.target.value})}/></label><label>Category<div className="word-bank-category-picker"><div className="word-bank-category-input-wrap"><input value={selected.category} onChange={e=>{const value=e.target.value;update({category:value});setCategoryQuery(value);setCategoryOpen(true)}} onFocus={()=>{setCategoryQuery(selected.category);setCategoryOpen(true)}} onBlur={()=>setTimeout(()=>setCategoryOpen(false),120)} onKeyDown={e=>{if(e.key==="Escape")setCategoryOpen(false);if(e.key==="Enter"&&categorySuggestions.length){e.preventDefault();const value=categorySuggestions[0];update({category:value});setCategoryQuery(value);setCategoryOpen(false)}}} placeholder="Type or search category…" aria-label="Category"/>{categoryOpen&&<div className="word-bank-category-menu">{categorySuggestions.length?categorySuggestions.map(category=><button type="button" key={category} onMouseDown={e=>e.preventDefault()} onClick={()=>{update({category});setCategoryQuery(category);setCategoryOpen(false)}}>{category}</button>):<div className="word-bank-category-empty">No matching categories.</div>}</div>}</div></div></label><label>Area<select value={selected.area} onChange={e=>update({area:e.target.value})}>{["chapter1","chapter2","chapter3","chapter4","chapter5","chapter6"].map(x=><option key={x}>{x}</option>)}</select></label><label>Source<input value={selected.source} onChange={e=>update({source:e.target.value})}/></label><label className="word-bank-checkbox"><input type="checkbox" checked={selected.verified} onChange={e=>update({verified:e.target.checked})}/> Verified</label>
    </>:<div className="word-bank-empty">Select a word to edit.</div>}</section>
   </div>
  </div>
