@@ -74,7 +74,7 @@ function edges(scene: Scene): Edge[] {
       if (scene[next]) result.push({ from: sceneId(i), to: sceneId(next) });
       return;
     }
-    if (isPhraseBuilderNode(node)) { if (node.next !== null && scene[node.next]) result.push({ from: sceneId(i), to: sceneId(node.next) }); return; }
+    if (isPhraseBuilderNode(node)) {\n      if (node.success !== null && scene[node.success]) result.push({ from: sceneId(i), to: sceneId(node.success) });\n      if (node.failure !== null && scene[node.failure]) result.push({ from: sceneId(i), to: sceneId(node.failure) });\n      return;\n    }
     if (!isDialogueNode(node)) return;
     if (node.choices?.length) {
       node.choices.forEach((choice, j) => {
@@ -135,7 +135,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
       continue;
     }
 
-    if (isPhraseBuilderNode(node)) { if (node.next !== null && scene[node.next] && !column.has(node.next)) { column.set(node.next, currentColumn + 1); gridRow.set(node.next, currentRow); queue.push(node.next); } continue; }
+    if (isPhraseBuilderNode(node)) {\n      [node.success, node.failure].forEach((next) => {\n        if (next !== null && scene[next] && !column.has(next)) { column.set(next, currentColumn + 1); gridRow.set(next, currentRow); queue.push(next); }\n      });\n      continue;\n    }
     if (!isDialogueNode(node)) continue;
 
     if (node.choices?.length) {
@@ -185,7 +185,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
 
   // Ordinary dialogue -> dialogue remains a straight horizontal chain.
   scene.forEach((node, sceneIndex) => {
-    if ((!isDialogueNode(node) && !isPhraseBuilderNode(node)) || (isDialogueNode(node) && node.choices?.length) || node.next === null || !scene[node.next]) return;
+    if ((!isDialogueNode(node) && !isPhraseBuilderNode(node)) || (isDialogueNode(node) && node.choices?.length)) return;\n    if (isPhraseBuilderNode(node)) return;\n    if (node.next === null || !scene[node.next]) return;
 
     const source = positions[sceneId(sceneIndex)];
     const target = positions[sceneId(node.next)];
@@ -740,7 +740,7 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
               }}>
                 <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isPhraseBuilderNode(source) ? "PHRASE BUILDER" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
                 <strong>{visual.kind === "choice" ? label || "Empty choice" : label}</strong>
-                <small>{visual.kind === "choice" ? `→ ${source && isDialogueNode(source) && source.choices?.[visual.choiceIndex!]?.next !== null ? `Node #${source.choices![visual.choiceIndex!].next}` : "End"}` : isPhraseBuilderNode(source) && source.next !== null ? `→ Node #${source.next}` : `#${visual.sceneIndex}`}</small>
+                <small>{visual.kind === "choice" ? `→ ${source && isDialogueNode(source) && source.choices?.[visual.choiceIndex!]?.next !== null ? `Node #${source.choices![visual.choiceIndex!].next}` : "End"}` : isPhraseBuilderNode(source) ? `✓ ${source.success ?? "End"} · ✕ ${source.failure ?? "End"}` : `#${visual.sceneIndex}`}</small>
               </button>
             );
           })}
@@ -771,13 +771,13 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
     onChange(next);
   }
 
-  function addPhraseBuilder(index: number) { if (!sceneData) return; const insert=index+1; const shift=(v:number|null)=>v!==null&&v>=insert?v+1:v; const next=sceneData.map((node):Scene[number]=>isDialogueNode(node)?{...node,next:shift(node.next),choices:node.choices?.map(c=>({...c,next:shift(c.next)}))}:isPhraseBuilderNode(node)?{...node,next:shift(node.next)}:node); next.splice(insert,0,{type:"phrase_builder",prompt:"",choices:[],answer:[],next:null}); onChange(next); setSelected({kind:"scene",sceneIndex:insert}); }
+  function addPhraseBuilder(index: number) { if (!sceneData) return; const insert=index+1; const shift=(v:number|null)=>v!==null&&v>=insert?v+1:v; const next=sceneData.map((node):Scene[number]=>isDialogueNode(node)?{...node,next:shift(node.next),choices:node.choices?.map(c=>({...c,next:shift(c.next)}))}:isPhraseBuilderNode(node)?{...node,success:shift(node.success),failure:shift(node.failure)}:node); next.splice(insert,0,{type:"phrase_builder",prompt:"",choices:[],answer:[],success:null,failure:null}); onChange(next); setSelected({kind:"scene",sceneIndex:insert}); }
 
   function addNode(index: number) {
     if (!sceneData) return;
     const insert = index + 1;
     const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
-    const next = sceneData.map((node): Scene[number] => isDialogueNode(node) ? { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : isPhraseBuilderNode(node) ? { ...node, next: shift(node.next) } : node);
+    const next = sceneData.map((node): Scene[number] => isDialogueNode(node) ? { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : isPhraseBuilderNode(node) ? { ...node, success: shift(node.success), failure: shift(node.failure) } : node);
     next.splice(insert, 0, { speaker: "", text: "", next: null, word_ids: [] });
     onChange(next);
     setSelected({ kind: "scene", sceneIndex: insert });
@@ -789,7 +789,7 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
     if (!isDialogueNode(node)) return;
     const insert = index + 1;
     const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
-    const next = sceneData.map((item): Scene[number] => isDialogueNode(item) ? { ...item, next: shift(item.next), choices: item.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : isPhraseBuilderNode(item) ? { ...item, next: shift(item.next) } : item);
+    const next = sceneData.map((item): Scene[number] => isDialogueNode(item) ? { ...item, next: shift(item.next), choices: item.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : isPhraseBuilderNode(item) ? { ...item, success: shift(item.success), failure: shift(item.failure) } : item);
     next.splice(insert, 0, { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) });
     onChange(next);
     setSelected({ kind: "scene", sceneIndex: insert });
@@ -799,7 +799,7 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
     if (!sceneData || (!isDialogueNode(sceneData[index]) && !isPhraseBuilderNode(sceneData[index]))) return;
     const next = sceneData.filter((_, i) => i !== index).map((node): Scene[number] => {
       const fix = (v: number | null) => v === index ? null : v !== null && v > index ? v - 1 : v;
-      if (isPhraseBuilderNode(node)) return { ...node, next: fix(node.next) };
+      if (isPhraseBuilderNode(node)) return { ...node, success: fix(node.success), failure: fix(node.failure) };
       if (!isDialogueNode(node)) return node;
       return { ...node, next: fix(node.next), choices: node.choices?.map((c) => ({ ...c, next: fix(c.next) })) };
     });
@@ -836,4 +836,3 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
     </div>
   );
 }
-
