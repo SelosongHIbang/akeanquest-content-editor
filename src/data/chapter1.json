@@ -141,17 +141,17 @@
       "type": "phrase_builder",
       "prompt": "Can you repeat it?",
       "choices": [
-        "agahon",
-        "mayad",
         "nga",
-        "ikaw/ka"
+        "ikaw/ka",
+        "mayad",
+        "agahon"
       ],
       "answer": [
         "mayad",
         "nga",
         "agahon"
       ],
-      "next": null
+      "next": 6
     },
     {
       "speaker": "Lola Jonabel",
