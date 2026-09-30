@@ -972,3 +972,39 @@
   font-size: 10px;
   text-align: center;
 }
+
+/* Word Bank category autocomplete */
+.word-bank-category-picker { position: relative; }
+.word-bank-category-input-wrap { position: relative; }
+.word-bank-category-menu {
+  position: absolute;
+  z-index: 30;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  padding: 7px 9px;
+  border: 1px solid rgb(63 63 70);
+  border-radius: 6px;
+  background: rgb(18 18 20);
+  box-shadow: 0 8px 20px rgb(0 0 0 / .35);
+}
+.word-bank-category-menu button {
+  border: 0;
+  background: transparent;
+  color: rgb(212 212 216);
+  padding: 2px 0;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.word-bank-category-menu button:hover { color: white; }
+.word-bank-category-menu button + button::before {
+  content: "|";
+  color: rgb(82 82 91);
+  margin-right: 8px;
+}
+.word-bank-category-empty { color: rgb(113 113 122); font-size: 10px; }
