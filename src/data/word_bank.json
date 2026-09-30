@@ -417,9 +417,9 @@
     {
       "id": "w047",
       "akeanon": "bisan",
-      "category": "",
+      "category": "conj.",
       "area": "chapter2",
-      "gloss": "Whatever / wherever / Even if / even / although",
+      "gloss": "although, no matter, even if",
       "verified": false,
       "source": ""
     },
@@ -461,10 +461,10 @@
     },
     {
       "id": "w052",
-      "akeanon": "Daán",
-      "category": "",
+      "akeanon": "Daan",
+      "category": "adj.",
       "area": "chapter2",
-      "gloss": "old",
+      "gloss": "old, ancient, former",
       "verified": false,
       "source": ""
     },
@@ -624,9 +624,9 @@
     {
       "id": "w070",
       "akeanon": "kung",
-      "category": "",
+      "category": "conj.",
       "area": "chapter2",
-      "gloss": "if",
+      "gloss": "if, when, whenever",
       "verified": false,
       "source": ""
     },
@@ -840,7 +840,7 @@
     {
       "id": "w094",
       "akeanon": "Pagkaon",
-      "category": "",
+      "category": "n",
       "area": "chapter2",
       "gloss": "food",
       "verified": false,
@@ -1479,9 +1479,9 @@
     {
       "id": "w165",
       "akeanon": "Bisan",
-      "category": "",
+      "category": "conj.",
       "area": "chapter4",
-      "gloss": "Whatever / wherever / Even if / even / although",
+      "gloss": "although, no matter, even if",
       "verified": false,
       "source": ""
     },
@@ -1695,9 +1695,9 @@
     {
       "id": "w189",
       "akeanon": "Bisan",
-      "category": "",
+      "category": "conj.",
       "area": "chapter5",
-      "gloss": "Whatever / wherever / Even if / even / although",
+      "gloss": "although, no matter, even if",
       "verified": false,
       "source": ""
     },
@@ -1767,7 +1767,7 @@
     {
       "id": "w197",
       "akeanon": "Kaon",
-      "category": "",
+      "category": "v",
       "area": "chapter5",
       "gloss": "to eat",
       "verified": false,
@@ -2121,6 +2121,78 @@
       "category": "",
       "area": "chapter6",
       "gloss": "travel",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w237",
+      "akeanon": "Tatay",
+      "category": "n",
+      "area": "chapter1",
+      "gloss": "father",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w238",
+      "akeanon": "Ina",
+      "category": "n",
+      "area": "chapter1",
+      "gloss": "mother",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w239",
+      "akeanon": "Kon",
+      "category": "conj.",
+      "area": "chapter2",
+      "gloss": "if, when, whenever",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w240",
+      "akeanon": "Ku",
+      "category": "am",
+      "area": "chapter2",
+      "gloss": "of, by, with",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w241",
+      "akeanon": "Taeamnan",
+      "category": "n",
+      "area": "chapter3",
+      "gloss": "field, farm, plantation",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w242",
+      "akeanon": "adto/agto",
+      "category": "v",
+      "area": "chapter2",
+      "gloss": "to go, to visit",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w243",
+      "akeanon": "Samad",
+      "category": "v",
+      "area": "chapter4",
+      "gloss": "to break, damage, ruin, destroy",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w244",
+      "akeanon": "Samad",
+      "category": "adj.",
+      "area": "chapter4",
+      "gloss": "broken, damaged, destroyed, ruined",
       "verified": false,
       "source": ""
     }
