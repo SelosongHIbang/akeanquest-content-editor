@@ -279,6 +279,7 @@ type WordBankEntry = WordBankReferenceEntry & {
 function WordIdPicker({
   value,
   onChange,
+  wordBank,
 }: {
   value: string[];
   onChange: (wordIds: string[]) => void;
