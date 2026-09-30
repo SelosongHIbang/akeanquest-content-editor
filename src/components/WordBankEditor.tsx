@@ -36,9 +36,32 @@ export default function WordBankEditor({data,onChange}:{data:WordBank;onChange:(
 
  function update(patch:Partial<WordEntry>){
   if(!selected)return;
-  const nextId=patch.id??selected.id;
-  onChange({words:data.words.map(w=>w.id===selected.id?{...w,...patch}:w)});
-  if(patch.id!==undefined)setSelectedId(nextId);
+  const nextPatch={...patch};
+  if(nextPatch.akeanon!==undefined){
+   const category=nextPatch.category??selected.category;
+   if(category.trim().toLocaleLowerCase()!=="proper noun (n)") nextPatch.akeanon=nextPatch.akeanon.toLocaleLowerCase();
+  }
+  if(nextPatch.category!==undefined && nextPatch.akeanon===undefined){
+   if(nextPatch.category.trim().toLocaleLowerCase()!=="proper noun (n)") nextPatch.akeanon=selected.akeanon.toLocaleLowerCase();
+  }
+  const nextId=nextPatch.id??selected.id;
+  onChange({words:data.words.map(w=>w.id===selected.id?{...w,...nextPatch}:w)});
+  if(nextPatch.id!==undefined)setSelectedId(nextId);
+ }
+
+ function sortAlphabetically(){
+  const selectedWord=data.words.find(w=>w.id===selectedId);
+  const sorted=[...data.words].sort((a,b)=>a.akeanon.localeCompare(b.akeanon,undefined,{sensitivity:"base"}));
+  const next=sorted.map((word,index)=>({
+   ...word,
+   akeanon:word.category.trim().toLocaleLowerCase()==="proper noun (n)"?word.akeanon:word.akeanon.toLocaleLowerCase(),
+   id:`w${String(index+1).padStart(3,"0")}`,
+  }));
+  onChange({words:next});
+  if(selectedWord){
+   const selectedIndex=sorted.indexOf(selectedWord);
+   setSelectedId(next[selectedIndex]?.id??null);
+  }
  }
 
  function add(){
@@ -76,7 +99,7 @@ export default function WordBankEditor({data,onChange}:{data:WordBank;onChange:(
  return <div className="word-bank-editor">
   <div className="word-bank-header">
    <div><strong>Word Bank</strong><span>{data.words.length} entries</span></div>
-   <div className="word-bank-actions"><button type="button" onClick={add}>+ Word</button><button type="button" className="save-button" onClick={save}>Save JSON</button><button type="button" className="danger" onClick={remove} disabled={!selected}>Delete</button></div>
+   <div className="word-bank-actions"><button type="button" onClick={add}>+ Word</button><button type="button" onClick={sortAlphabetically}>A–Z</button><button type="button" className="save-button" onClick={save}>Save JSON</button><button type="button" className="danger" onClick={remove} disabled={!selected}>Delete</button></div>
   </div>
   <div className="word-bank-body">
    <section className="word-bank-list">
