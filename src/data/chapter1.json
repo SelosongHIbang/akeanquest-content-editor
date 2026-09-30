@@ -141,10 +141,12 @@
       "type": "phrase_builder",
       "prompt": "Can you repeat it?",
       "choices": [
-        "mayad",
-        "nga"
+        "nga",
+        "mayad"
       ],
-      "answer": [],
+      "answer": [
+        ""
+      ],
       "next": null
     },
     {
