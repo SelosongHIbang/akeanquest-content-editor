@@ -158,7 +158,7 @@
     {
       "speaker": "Lola Jonabel",
       "text": "Well done \\apo.",
-      "next": null,
+      "next": 9,
       "type": "dialogue",
       "word_ids": [
         "w019"
