@@ -342,11 +342,11 @@
         },
         {
           "label": "Give me a second, it's already too many at once.",
-          "next": 6
+          "next": 7
         },
         {
           "label": "Can we save the rest for later, Rose? My brain hurts.",
-          "next": 7
+          "next": 8
         }
       ],
       "next": null,
