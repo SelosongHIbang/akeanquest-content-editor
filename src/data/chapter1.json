@@ -14,12 +14,14 @@
       "word_ids": [
         "w173",
         "w010"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Player",
       "text": "Grandma, are you okay? You've been staring at that photo for a while.",
-      "next": 3
+      "next": 3,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
@@ -27,12 +29,14 @@
       "next": 4,
       "word_ids": [
         "w147"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Player",
       "text": "Then let's go. Talk to Dad.",
-      "next": 5
+      "next": 5,
+      "type": "dialogue"
     },
     {
       "speaker": "Player",
@@ -52,7 +56,8 @@
         }
       ],
       "next": null,
-      "word_ids": []
+      "word_ids": [],
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
@@ -62,12 +67,14 @@
       "word_ids": [
         "w206",
         "w019"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
       "text": "That's alright. You'll learn — the language will teach you where you're from.",
-      "next": 9
+      "next": 9,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
@@ -75,19 +82,22 @@
       "next": 9,
       "word_ids": [
         "w084"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
       "text": "I'll tell your father about our plan",
       "next": 10,
-      "word_ids": []
+      "word_ids": [],
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
       "text": "You go to your room and go check your notebook.",
       "next": null,
-      "word_ids": []
+      "word_ids": [],
+      "type": "dialogue"
     }
   ],
   "scene_2_kalibo_international_airport_arrival": [
@@ -100,7 +110,8 @@
     {
       "speaker": "Papa Jobert",
       "text": "Wow, this place doesn't change. Same humidity as I remember, huh, Ma.",
-      "next": 2
+      "next": 2,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
@@ -111,52 +122,48 @@
         "w163",
         "w180",
         "w006"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Player",
       "text": "Grandma, teach me that. I want to say it right when we meet Aunt Susan.",
-      "next": 4
+      "next": 4,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
       "text": "Just follow along. mayad nga agahon.",
-      "next": 5
+      "next": 5,
+      "type": "dialogue"
     },
     {
-      "speaker": "Lola Jonabel",
-      "text": "Can you repeat it?",
+      "type": "phrase_builder",
+      "prompt": "Can you repeat it?",
       "choices": [
-        {
-          "label": "Mayad nga agahon! Did I say it right, Grandma?",
-          "next": 6
-        },
-        {
-          "label": "Mayad nga agahon? I'll practice more.",
-          "next": 6
-        },
-        {
-          "label": "This is going to take forever, I don't think I can do this.",
-          "next": 7
-        }
+        "mayad",
+        "nga"
       ],
-      "next": null,
-      "word_ids": []
+      "answer": [],
+      "next": null
     },
     {
       "speaker": "Lola Jonabel",
       "text": "Almost! You're closer than you think, Apo.",
-      "next": 8
+      "next": 8,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
       "text": "Practice makes it stick. We have time.",
-      "next": 8
+      "next": 8,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
       "text": "Don't rush yourself, Apo. Even I forgot some words — and this is my home.",
-      "next": 9
+      "next": 9,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Jonabel",
@@ -165,12 +172,14 @@
       "translation": "How are you? — same line, spoken to greet.",
       "word_ids": [
         "w083"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Papa Jobert",
       "text": "Come on, Aunt Susan is outside already. Let's not keep her waiting.",
-      "next": null
+      "next": null,
+      "type": "dialogue"
     }
   ],
   "scene_3_kalibo_town_proper_reunion": [
@@ -185,32 +194,38 @@
       "speaker": "Lola Susan",
       "text": "Jonabel! Siin ka eon, sister?!",
       "next": 2,
-      "translation": "Jonabel! Where have you been, sister?!"
+      "translation": "Jonabel! Where have you been, sister?!",
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "(mumbles) So this is the balikbayan cousin, huh.",
-      "next": 3
+      "next": 3,
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Susan",
       "text": "Rose! I told you, introduce yourself. This is Jonabel's grandchild — you'll help her learn Akeanon, okay?",
-      "next": 4
+      "next": 4,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "(sighs) Fine. But don't expect me to go easy just because you flew in from abroad.",
-      "next": 5
+      "next": 5,
+      "type": "dialogue"
     },
     {
       "speaker": "Player",
       "text": "I mean... I did fly like 14 hours, so a little easy would be nice.",
-      "next": 6
+      "next": 6,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "14 hours doesn't teach you a language. I do. Deal's a deal, Aunt Susan.",
-      "next": 7
+      "next": 7,
+      "type": "dialogue"
     },
     {
       "speaker": "",
@@ -229,22 +244,26 @@
           "next": 9
         }
       ],
-      "next": null
+      "next": null,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "Good. Don't waste my time then, balikbayan.",
-      "next": 10
+      "next": 10,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "Fair enough. Effort matters more than talent anyway.",
-      "next": 10
+      "next": 10,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "Then why'd you come? ...whatever. Your loss if you don't try.",
-      "next": 11
+      "next": 11,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
@@ -252,13 +271,15 @@
       "next": null,
       "word_ids": [
         "w059"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Lola Susan",
       "text": "Jonabel! Siin ka eon, sister?! And this must be her -- I heard she's been so excited to finally come, bless her heart.",
       "next": 2,
-      "translation": "Jonabel! Where have you been, sister?! And this must be her -- I heard she's been so excited to finally come, bless her heart."
+      "translation": "Jonabel! Where have you been, sister?! And this must be her -- I heard she's been so excited to finally come, bless her heart.",
+      "type": "dialogue"
     }
   ],
   "scene_4_vocabulary_practice_round_family_pronouns_numbers": [
@@ -271,7 +292,8 @@
     {
       "speaker": "Rose",
       "text": "Okay, quick drill before we go home. Focus, balikbayan.",
-      "next": 2
+      "next": 2,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
@@ -279,12 +301,14 @@
       "next": 3,
       "word_ids": [
         "w092"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Player",
       "text": "Okay, ako... ikaw... siya. Got it, I think.",
-      "next": 4
+      "next": 4,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
@@ -292,7 +316,8 @@
       "next": 5,
       "word_ids": [
         "w104"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "",
@@ -311,22 +336,26 @@
           "next": 7
         }
       ],
-      "next": null
+      "next": null,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "That's what I like to hear. Fine, one more batch.",
-      "next": 8
+      "next": 8,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "Fair. Take your time, we've got a walk ahead anyway.",
-      "next": 8
+      "next": 8,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "Ugh, fine. But we're picking this up again tomorrow.",
-      "next": 9
+      "next": 9,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
@@ -334,7 +363,8 @@
       "next": 10,
       "word_ids": [
         "w033"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
@@ -342,17 +372,20 @@
       "next": 11,
       "word_ids": [
         "w064"
-      ]
+      ],
+      "type": "dialogue"
     },
     {
       "speaker": "Player",
       "text": "Isa, daywa, tatlo, apat, lima. Hey, that wasn't so bad.",
-      "next": 12
+      "next": 12,
+      "type": "dialogue"
     },
     {
       "speaker": "Rose",
       "text": "See? Told you. Baby steps, balikbayan.",
-      "next": null
+      "next": null,
+      "type": "dialogue"
     }
   ],
   "idle_pool_lola_jonabel": {
