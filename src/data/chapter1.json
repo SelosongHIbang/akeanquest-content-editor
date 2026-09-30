@@ -179,10 +179,16 @@
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "Do you want to try a",
+      "text": "Do you want to try again?",
       "next": 8,
       "word_ids": [],
-      "type": "dialogue"
+      "type": "dialogue",
+      "choices": [
+        {
+          "label": "New choice",
+          "next": null
+        }
+      ]
     }
   ],
   "scene_3_kalibo_town_proper_reunion": [
