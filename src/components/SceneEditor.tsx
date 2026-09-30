@@ -275,25 +275,26 @@ function autoLayout(scene: Scene): Record<string, Point> {
     });
   });
 
-  // Give Phrase Builder success/failure branches separate rows so their
-  // destination nodes never sit directly on top of each other.
+  // Phrase Builder branches use the exact same row/column logic as choices:
+  // Success stays on the source row; Failure starts one row below it.
   scene.forEach((node, sceneIndex) => {
     if (!isPhraseBuilderNode(node)) return;
+
     const source = positions[sceneId(sceneIndex)];
     if (!source) return;
 
-    const targets = [node.success, node.failure].filter(
-      (value, index, values): value is number => value !== null && scene[value] !== undefined && values.indexOf(value) === index,
-    );
+    const branches = [node.success, node.failure];
 
-    targets.forEach((targetIndex, branchIndex) => {
+    branches.forEach((targetIndex, branchIndex) => {
+      if (targetIndex === null || !scene[targetIndex]) return;
+
       const target = positions[sceneId(targetIndex)];
       if (!target) return;
-      const offset = targets.length === 1 ? 0 : (branchIndex === 0 ? -0.5 : 0.5) * ROW_PITCH;
+
       positions[sceneId(targetIndex)] = {
         ...target,
-        x: Math.max(target.x, source.x + STEP_X),
-        y: source.y + offset,
+        x: source.x + STEP_X,
+        y: source.y + branchIndex * ROW_PITCH,
       };
     });
   });
