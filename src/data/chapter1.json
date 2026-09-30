@@ -20,8 +20,9 @@
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "I just want to go back. One more kauli, before... before I get too old to travel.",
-      "next": 4
+      "text": "I just want to go back. , before... before I get too old to travel.",
+      "next": 4,
+      "word_ids": []
     },
     {
       "speaker": "Player",
