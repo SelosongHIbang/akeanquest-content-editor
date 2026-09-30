@@ -739,7 +739,11 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
             const isSelected = selected && nodeId(selected) === visual.id;
             const width = visual.kind === "choice" ? CHOICE_WIDTH : NODE_WIDTH;
             const source = scene[visual.sceneIndex];
-            const label = visual.kind === "choice" && isDialogueNode(source) ? source.choices![visual.choiceIndex!].label : title(source, visual.sceneIndex);
+            const label = visual.kind === "choice" && isDialogueNode(source)
+              ? source.choices![visual.choiceIndex!].label
+              : isDialogueNode(source)
+                ? source.text || (source.choices?.length ? "User Prompt" : "Empty dialogue")
+                : title(source, visual.sceneIndex);
             return (
               <button key={visual.id} type="button" data-node className={`scene-graph-node ${visual.kind} ${visual.kind === "choice" ? "type-choice" : isStartRouter(source) ? "type-start" : isPhraseBuilderNode(source) ? "type-phrase" : isDialogueNode(source) && source.choices?.length ? "type-prompt" : "type-dialogue"} ${isSelected ? "selected" : ""}`} style={{ left: p.x, top: p.y, width }} onClick={(e) => {
                 e.stopPropagation();
@@ -750,7 +754,7 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
                 onSelect(visual.kind === "choice" ? { kind: "choice", sceneIndex: visual.sceneIndex, choiceIndex: visual.choiceIndex! } : { kind: "scene", sceneIndex: visual.sceneIndex });
               }}>
                 <span className="scene-graph-node-meta">
-                  <span className="scene-graph-node-speaker">{visual.kind === "choice" ? "—" : isDialogueNode(source) ? source.speaker || "—" : "—"}</span>
+                  <span className="scene-graph-node-speaker">{visual.kind === "choice" ? "Player" : isDialogueNode(source) ? source.speaker || "—" : "—"}</span>
                   <span className="scene-graph-node-divider">|</span>
                   <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isPhraseBuilderNode(source) ? "PHRASE BUILDER" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
                 </span>
