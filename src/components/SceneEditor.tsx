@@ -209,43 +209,6 @@ function autoLayout(scene: Scene): Record<string, Point> {
   });
 
 
-  // If a scene column contains only one node, align that node with the
-  // most recent prompt row instead of leaving it on an isolated branch row.
-  // This keeps single-node columns visually continuous with the preceding
-  // conversation flow.
-  const nodesByColumn = new Map<number, number[]>();
-  scene.forEach((_, index) => {
-    const col = column.get(index) ?? 0;
-    const list = nodesByColumn.get(col) ?? [];
-    list.push(index);
-    nodesByColumn.set(col, list);
-  });
-
-  const promptRows = scene
-    .map((node, index) => ({ node, index }))
-    .filter(({ node }) => isDialogueNode(node) && !!node.choices?.length)
-    .map(({ index }) => ({
-      column: column.get(index) ?? 0,
-      y: positions[sceneId(index)]?.y ?? START_Y,
-    }))
-    .sort((a, b) => a.column - b.column);
-
-  nodesByColumn.forEach((indices, col) => {
-    if (indices.length !== 1) return;
-
-    const target = indices[0];
-    const previousPrompt = [...promptRows]
-      .filter((prompt) => prompt.column < col)
-      .pop();
-
-    if (!previousPrompt) return;
-
-    positions[sceneId(target)] = {
-      ...positions[sceneId(target)],
-      y: previousPrompt.y,
-    };
-  });
-
   // Choices occupy the fixed column immediately after the prompt.
   // Every choice uses the same X and only its grid row changes.
   scene.forEach((node, sceneIndex) => {
