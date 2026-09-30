@@ -236,6 +236,55 @@ function autoLayout(scene: Scene): Record<string, Point> {
     });
   }
 
+  // If multiple precursors point to the same scene node, follow the
+  // highest (topmost) precursor row. This is the merge rule: the destination
+  // belongs to the highest incoming branch rather than whichever precursor
+  // happened to be processed last.
+  const incoming = new Map<number, { x: number; y: number }[]>();
+
+  scene.forEach((node, sceneIndex) => {
+    const source = positions[sceneId(sceneIndex)];
+    if (!source) return;
+
+    if (isPhraseBuilderNode(node)) {
+      [node.success, node.failure].forEach((targetIndex) => {
+        if (targetIndex === null || !scene[targetIndex]) return;
+        const list = incoming.get(targetIndex) ?? [];
+        list.push({ x: source.x, y: source.y });
+        incoming.set(targetIndex, list);
+      });
+      return;
+    }
+
+    if (!isDialogueNode(node)) return;
+
+    if (node.choices?.length) {
+      node.choices.forEach((choice, choiceIndex) => {
+        if (choice.next === null || !scene[choice.next]) return;
+        const choiceY = source.y + choiceIndex * ROW_PITCH;
+        const list = incoming.get(choice.next) ?? [];
+        list.push({ x: source.x + STEP_X, y: choiceY });
+        incoming.set(choice.next, list);
+      });
+    } else if (node.next !== null && scene[node.next]) {
+      const list = incoming.get(node.next) ?? [];
+      list.push({ x: source.x, y: source.y });
+      incoming.set(node.next, list);
+    }
+  });
+
+  incoming.forEach((precursors, targetIndex) => {
+    if (precursors.length < 2) return;
+    const highest = precursors.reduce((top, precursor) => precursor.y < top.y ? precursor : top);
+    const target = positions[sceneId(targetIndex)];
+    if (!target) return;
+    positions[sceneId(targetIndex)] = {
+      ...target,
+      x: Math.max(target.x, highest.x + STEP_X),
+      y: highest.y,
+    };
+  });
+
   // Choices are laid out last so a prompt that follows a branch uses its
   // final row. Every choice starts from that prompt row and continues
   // downward by one fixed row pitch.
