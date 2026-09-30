@@ -70,8 +70,9 @@ function edges(scene: Scene): Edge[] {
   const result: Edge[] = [];
   scene.forEach((node, i) => {
     if (isStartRouter(node)) {
-      const next = node.start_index_if_flag.default;
-      if (scene[next]) result.push({ from: sceneId(i), to: sceneId(next) });
+      [...new Set(Object.values(node.start_index_if_flag))]
+        .filter((next): next is number => typeof next === "number" && scene[next] !== undefined)
+        .forEach((next) => result.push({ from: sceneId(i), to: sceneId(next) }));
       return;
     }
     if (isPhraseBuilderNode(node)) {
@@ -135,8 +136,9 @@ function autoLayout(scene: Scene): Record<string, Point> {
     const node = scene[sceneIndex];
 
     if (isStartRouter(node)) {
-      const next = node.start_index_if_flag.default;
-      return scene[next] ? [sceneId(next)] : [];
+      return [...new Set(Object.values(node.start_index_if_flag))]
+        .filter((next): next is number => typeof next === "number" && scene[next] !== undefined)
+        .map(sceneId);
     }
 
     if (isPhraseBuilderNode(node)) {
