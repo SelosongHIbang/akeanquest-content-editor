@@ -192,63 +192,18 @@ function autoLayout(scene: Scene): Record<string, Point> {
     };
   });
 
-  // Ordinary dialogue -> dialogue remains a straight horizontal chain.
-  scene.forEach((node, sceneIndex) => {
-    if ((!isDialogueNode(node) && !isPhraseBuilderNode(node)) || (isDialogueNode(node) && node.choices?.length)) return;
-    if (isPhraseBuilderNode(node)) return;
-    if (node.next === null || !scene[node.next]) return;
-
-    const source = positions[sceneId(sceneIndex)];
-    const target = positions[sceneId(node.next)];
-    if (!source || !target) return;
-
-    positions[sceneId(node.next)] = {
-      x: Math.max(target.x, source.x + STEP_X),
-      y: source.y,
-    };
-  });
-
-
-  // Choices occupy the fixed column immediately after the prompt.
-  // Every choice uses the same X and only its grid row changes.
-  scene.forEach((node, sceneIndex) => {
-    if (!isDialogueNode(node) || !node.choices?.length) return;
-
-    const prompt = positions[sceneId(sceneIndex)];
-
-    node.choices.forEach((choice, choiceIndex) => {
-      // The first choice starts on the exact same row as the prompt.
-      // Additional choices continue downward on the fixed grid.
-      const choiceY = prompt.y + choiceIndex * ROW_PITCH;
-
-      positions[choiceId(sceneIndex, choiceIndex)] = {
-        x: prompt.x + NODE_WIDTH + COLUMN_GAP,
-        y: choiceY,
-      };
-
-      if (choice.next !== null && scene[choice.next]) {
-        const target = positions[sceneId(choice.next)];
-        if (target) {
-          // LOCK the destination to the same column for every branch.
-          target.x = prompt.x + STEP_X * 2;
-          target.y = choiceY;
-          positions[sceneId(choice.next)] = target;
-        }
-      }
-    });
-  });
-
-  // Phrase Builder branches use the exact same row/column logic as choices:
-  // Success stays on the source row; Failure starts one row below it.
+  // Branch destinations are positioned first. Any ordinary continuation from
+  // one of those destinations is then propagated onto the same row.
+  //
+  // This order matters: if a Phrase Builder moves its Failure destination
+  // down one row, the node that Failure points to must move down with it.
   scene.forEach((node, sceneIndex) => {
     if (!isPhraseBuilderNode(node)) return;
 
     const source = positions[sceneId(sceneIndex)];
     if (!source) return;
 
-    const branches = [node.success, node.failure];
-
-    branches.forEach((targetIndex, branchIndex) => {
+    [node.success, node.failure].forEach((targetIndex, branchIndex) => {
       if (targetIndex === null || !scene[targetIndex]) return;
 
       const target = positions[sceneId(targetIndex)];
@@ -259,6 +214,55 @@ function autoLayout(scene: Scene): Record<string, Point> {
         x: source.x + STEP_X,
         y: source.y + branchIndex * ROW_PITCH,
       };
+    });
+  });
+
+  // A node with one ordinary predecessor stays on that predecessor's row.
+  // Run this after branch placement so the continuation follows a branch
+  // destination that was just moved.
+  for (let pass = 0; pass < scene.length; pass += 1) {
+    scene.forEach((node, sceneIndex) => {
+      if (!isDialogueNode(node) || node.choices?.length || node.next === null || !scene[node.next]) return;
+
+      const source = positions[sceneId(sceneIndex)];
+      const target = positions[sceneId(node.next)];
+      if (!source || !target) return;
+
+      positions[sceneId(node.next)] = {
+        ...target,
+        x: Math.max(target.x, source.x + STEP_X),
+        y: source.y,
+      };
+    });
+  }
+
+  // Choices are laid out last so a prompt that follows a branch uses its
+  // final row. Every choice starts from that prompt row and continues
+  // downward by one fixed row pitch.
+  scene.forEach((node, sceneIndex) => {
+    if (!isDialogueNode(node) || !node.choices?.length) return;
+
+    const prompt = positions[sceneId(sceneIndex)];
+    if (!prompt) return;
+
+    node.choices.forEach((choice, choiceIndex) => {
+      const choiceY = prompt.y + choiceIndex * ROW_PITCH;
+
+      positions[choiceId(sceneIndex, choiceIndex)] = {
+        x: prompt.x + NODE_WIDTH + COLUMN_GAP,
+        y: choiceY,
+      };
+
+      if (choice.next !== null && scene[choice.next]) {
+        const target = positions[sceneId(choice.next)];
+        if (!target) return;
+
+        positions[sceneId(choice.next)] = {
+          ...target,
+          x: prompt.x + STEP_X * 2,
+          y: choiceY,
+        };
+      }
     });
   });
 
