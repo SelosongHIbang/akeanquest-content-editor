@@ -457,7 +457,7 @@ function SceneInspector({
           type: "dialogue",
           speaker: "",
           text: node.answer.join(" "),
-          next: node.next,
+          next: node.success,
           translation: node.translation,
           word_ids: wordIds,
         });
@@ -487,7 +487,8 @@ function SceneInspector({
           prompt: node.text,
           choices,
           answer,
-          next: node.next,
+          success: node.success,
+          failure: node.failure,
           translation: node.translation,
         });
       } else if (isStartRouter(node)) {
@@ -496,7 +497,8 @@ function SceneInspector({
           prompt: "",
           choices: [],
           answer: [],
-          next: node.start_index_if_flag.default ?? null,
+          success: node.start_index_if_flag.default ?? null,
+          failure: null,
         });
       }
       return;
@@ -506,7 +508,7 @@ function SceneInspector({
       onChange(selected.sceneIndex, {
         type: "start_router",
         start_index_if_flag: {
-          default: isStartRouter(node) ? node.start_index_if_flag.default : isDialogueNode(node) || isPhraseBuilderNode(node) ? node.next : null,
+          default: isStartRouter(node) ? node.start_index_if_flag.default : isDialogueNode(node) ? node.next : isPhraseBuilderNode(node) ? node.success : null,
         },
       });
     }
