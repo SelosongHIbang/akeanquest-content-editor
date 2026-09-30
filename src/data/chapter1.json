@@ -23,9 +23,11 @@
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "I just want to go back., before... before I get too old to travel.",
+      "text": "I just want to go back. \\Makauli once more, before... before I get too old to travel.",
       "next": 4,
-      "word_ids": []
+      "word_ids": [
+        "w147"
+      ]
     },
     {
       "speaker": "Player",
@@ -33,8 +35,8 @@
       "next": 5
     },
     {
-      "speaker": "",
-      "text": "How will you tell Grandma?",
+      "speaker": "Player",
+      "text": "",
       "choices": [
         {
           "label": "I'll help you plan it, Grandma. We're really going.",
@@ -49,13 +51,18 @@
           "next": 8
         }
       ],
-      "next": null
+      "next": null,
+      "word_ids": []
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "Saeamat, Apo. This old heart needed to hear that.",
+      "text": "\\Saeamat, \\Apo. This old heart needed to hear that.",
       "next": 9,
-      "set_flag_on_enter": "warm_toward_lola"
+      "set_flag_on_enter": "warm_toward_lola",
+      "word_ids": [
+        "w206",
+        "w019"
+      ]
     },
     {
       "speaker": "Lola Jonabel",
@@ -72,14 +79,21 @@
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "Let's call your father. We need to book the flights now.",
-      "next": null
+      "text": "I'll tell your father about our plan",
+      "next": 10,
+      "word_ids": []
+    },
+    {
+      "speaker": "Lola Jonabel",
+      "text": "You go to your room and go check your notebook.",
+      "next": null,
+      "word_ids": []
     }
   ],
   "scene_2_kalibo_international_airport_arrival": [
     {
       "start_index_if_flag": {
-        "default": 0
+        "default": 1
       },
       "type": "start_router"
     },
@@ -90,11 +104,13 @@
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "Mayad nga agahon sa Aklan.",
+      "text": "\\Mayad \\nga \\agahon Aklan.",
       "next": 3,
       "translation": "Good morning in Aklan.",
       "word_ids": [
-        "w057"
+        "w163",
+        "w180",
+        "w006"
       ]
     },
     {
@@ -108,8 +124,8 @@
       "next": 5
     },
     {
-      "speaker": "",
-      "text": "Try to pronounce it.",
+      "speaker": "Lola Jonabel",
+      "text": "Can you repeat it?",
       "choices": [
         {
           "label": "Mayad nga agahon! Did I say it right, Grandma?",
@@ -124,7 +140,8 @@
           "next": 7
         }
       ],
-      "next": null
+      "next": null,
+      "word_ids": []
     },
     {
       "speaker": "Lola Jonabel",
