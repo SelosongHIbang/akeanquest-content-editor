@@ -434,6 +434,73 @@ function SceneInspector({
 
   const node = scene[selected.sceneIndex];
 
+  const changeNodeType = (type: "dialogue" | "phrase_builder" | "start_router") => {
+    if (node.type === type) return;
+
+    if (type === "dialogue") {
+      if (isPhraseBuilderNode(node)) {
+        const wordIds = node.answer
+          .map((word) => wordBank.find((entry) => entry.akeanon.toLocaleLowerCase() === word.toLocaleLowerCase())?.id)
+          .filter((id): id is string => Boolean(id));
+        onChange(selected.sceneIndex, {
+          type: "dialogue",
+          speaker: "",
+          text: node.answer.join(" "),
+          next: node.next,
+          translation: node.translation,
+          word_ids: wordIds,
+        });
+      } else if (isStartRouter(node)) {
+        onChange(selected.sceneIndex, {
+          type: "dialogue",
+          speaker: "",
+          text: "",
+          next: node.start_index_if_flag.default ?? null,
+          word_ids: [],
+        });
+      }
+      return;
+    }
+
+    if (type === "phrase_builder") {
+      if (isDialogueNode(node)) {
+        const answer = (node.word_ids ?? [])
+          .map((id) => wordBank.find((entry) => entry.id === id)?.akeanon)
+          .filter((word): word is string => Boolean(word));
+        const referenced = [...new Set(scene.flatMap((item) => isDialogueNode(item) ? (item.word_ids ?? []) : []))]
+          .map((id) => wordBank.find((entry) => entry.id === id)?.akeanon)
+          .filter((word): word is string => Boolean(word));
+        const choices = [...new Set([...answer, ...referenced.filter((word) => !answer.includes(word)).slice(0, 2)])];
+        onChange(selected.sceneIndex, {
+          type: "phrase_builder",
+          prompt: node.text,
+          choices,
+          answer,
+          next: node.next,
+          translation: node.translation,
+        });
+      } else if (isStartRouter(node)) {
+        onChange(selected.sceneIndex, {
+          type: "phrase_builder",
+          prompt: "",
+          choices: [],
+          answer: [],
+          next: node.start_index_if_flag.default ?? null,
+        });
+      }
+      return;
+    }
+
+    if (type === "start_router") {
+      onChange(selected.sceneIndex, {
+        type: "start_router",
+        start_index_if_flag: {
+          default: isStartRouter(node) ? node.start_index_if_flag.default : node.next ?? null,
+        },
+      });
+    }
+  };
+
   if (isPhraseBuilderNode(node)) {
     const update = <K extends keyof PhraseBuilderNode>(field: K, value: PhraseBuilderNode[K]) => onChange(selected.sceneIndex, { ...node, [field]: value });
     const referencedIds = [...new Set(scene.flatMap((item) => isDialogueNode(item) ? (item.word_ids ?? []) : []))];
@@ -448,6 +515,7 @@ function SceneInspector({
     return (<aside className="scene-inspector">
       <div className="scene-inspector-header"><span>PHRASE BUILDER</span><strong>Node #{selected.sceneIndex}</strong><small>Construct a sentence from word choices</small></div>
       <div className="scene-inspector-body">
+        <Field label="Type"><select value={node.type} onChange={(e) => changeNodeType(e.target.value as "dialogue" | "phrase_builder" | "start_router")}><option value="dialogue">Dialogue</option><option value="phrase_builder">Phrase Builder</option><option value="start_router">Start Router</option></select></Field>
         <Field label="Prompt"><textarea value={node.prompt} onChange={(e) => update("prompt", e.target.value)} rows={5} placeholder="What should the player construct?" /></Field>
         <Field label="Correct Answer"><div className="phrase-answer-list">
           {node.answer.map((word, index) => <div className="phrase-answer-row" key={index}><span>{index + 1}</span><select value={word} onChange={(e) => { const answer=[...node.answer]; answer[index]=e.target.value; setAnswer(answer); }}><option value="">Select a word…</option>{wordBank.map((entry)=><option key={entry.id} value={entry.akeanon}>{entry.akeanon} · {entry.id}</option>)}</select><button type="button" onClick={()=>setAnswer(node.answer.filter((_,i)=>i!==index))}>×</button></div>)}
@@ -465,6 +533,7 @@ function SceneInspector({
       <aside className="scene-inspector">
         <div className="scene-inspector-header"><span>SCENE NODE</span><strong>Scene Start</strong><small>Node #0</small></div>
         <div className="scene-inspector-body">
+          <Field label="Type"><select value={node.type} onChange={(e) => changeNodeType(e.target.value as "dialogue" | "phrase_builder" | "start_router")}><option value="dialogue">Dialogue</option><option value="phrase_builder">Phrase Builder</option><option value="start_router">Start Router</option></select></Field>
           <p className="scene-inspector-help">Controls which node starts when a flag condition matches.</p>
           {Object.entries(node.start_index_if_flag).map(([flag, value]) => (
             <Field key={flag} label={flag}><input type="number" value={value} onChange={(e) => onChange(selected.sceneIndex, { ...node, start_index_if_flag: { ...node.start_index_if_flag, [flag]: Number(e.target.value) } })} /></Field>
@@ -486,6 +555,7 @@ function SceneInspector({
     <aside className="scene-inspector">
       <div className="scene-inspector-header"><span>{node.choices?.length ? "USER PROMPT" : "DIALOGUE"}</span><strong>Node #{selected.sceneIndex}</strong><small>{node.speaker || "No speaker"}</small></div>
       <div className="scene-inspector-body">
+        <Field label="Type"><select value={node.type} onChange={(e) => changeNodeType(e.target.value as "dialogue" | "phrase_builder" | "start_router")}><option value="dialogue">Dialogue</option><option value="phrase_builder">Phrase Builder</option><option value="start_router">Start Router</option></select></Field>
         <Field label="Speaker"><input value={node.speaker} onChange={(e) => update("speaker", e.target.value)} placeholder="Speaker" /></Field>
         <Field label={node.choices?.length ? "User Prompt" : "Dialogue"}><textarea value={node.text} onChange={(e) => updateText(e.target.value)} rows={8} /></Field>
         <Field label="Translation"><textarea value={node.translation ?? ""} onChange={(e) => update("translation", e.target.value || undefined)} rows={5} /></Field>
