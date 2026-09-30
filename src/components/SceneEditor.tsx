@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import type { Scene, IdlePool, DialogueNode as DialogueNodeType, Choice, StartRouter } from "../types/content";
+import type { Scene, IdlePool, DialogueNode as DialogueNodeType, PhraseBuilderNode, Choice, StartRouter } from "../types/content";
 import { resolveWordReferences, syncWordIdsFromText, type WordBankReferenceEntry } from "../utils/wordReferences";
 
 type SceneEditorProps = {
@@ -25,11 +25,13 @@ function isScene(data: Scene | IdlePool): data is Scene { return Array.isArray(d
 function isStartRouter(node: Scene[number]): node is StartRouter {
   return typeof node === "object" && node !== null && "type" in node && node.type === "start_router";
 }
+function isPhraseBuilderNode(node: Scene[number]): node is PhraseBuilderNode { return typeof node === "object" && node !== null && "type" in node && node.type === "phrase_builder"; }
 function isDialogueNode(node: Scene[number]): node is DialogueNodeType {
   return typeof node === "object" && node !== null && "speaker" in node && "text" in node && "next" in node;
 }
 function title(node: Scene[number], index: number) {
   if (isStartRouter(node)) return "Scene Start";
+  if (isPhraseBuilderNode(node)) return node.prompt || "Phrase Builder";
   if (!isDialogueNode(node)) return `Node ${index}`;
   return node.choices?.length ? node.text || "User Prompt" : node.speaker || node.text || `Node ${index}`;
 }
@@ -42,6 +44,7 @@ function nodeId(selected: SelectedNode) {
 }
 function nodeHeight(node: Scene[number]) {
   if (isStartRouter(node)) return 70;
+  if (isPhraseBuilderNode(node)) return 110;
   if (!isDialogueNode(node)) return 80;
   const text = node.text || "";
   return Math.min(150, 82 + Math.max(0, Math.ceil(text.length / 42) - 1) * 14);
@@ -71,6 +74,7 @@ function edges(scene: Scene): Edge[] {
       if (scene[next]) result.push({ from: sceneId(i), to: sceneId(next) });
       return;
     }
+    if (isPhraseBuilderNode(node)) { if (node.next !== null && scene[node.next]) result.push({ from: sceneId(i), to: sceneId(node.next) }); return; }
     if (!isDialogueNode(node)) return;
     if (node.choices?.length) {
       node.choices.forEach((choice, j) => {
@@ -131,6 +135,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
       continue;
     }
 
+    if (isPhraseBuilderNode(node)) { if (node.next !== null && scene[node.next] && !column.has(node.next)) { column.set(node.next, currentColumn + 1); gridRow.set(node.next, currentRow); queue.push(node.next); } continue; }
     if (!isDialogueNode(node)) continue;
 
     if (node.choices?.length) {
@@ -180,7 +185,7 @@ function autoLayout(scene: Scene): Record<string, Point> {
 
   // Ordinary dialogue -> dialogue remains a straight horizontal chain.
   scene.forEach((node, sceneIndex) => {
-    if (!isDialogueNode(node) || node.choices?.length || node.next === null || !scene[node.next]) return;
+    if ((!isDialogueNode(node) && !isPhraseBuilderNode(node)) || (isDialogueNode(node) && node.choices?.length) || node.next === null || !scene[node.next]) return;
 
     const source = positions[sceneId(sceneIndex)];
     const target = positions[sceneId(node.next)];
@@ -397,6 +402,7 @@ function SceneInspector({
   onDuplicate: (index: number) => void;
   onDelete: (index: number) => void;
   onSelectChoice: (choiceIndex: number) => void;
+  onAddPhraseBuilder: (index: number) => void;
   wordBank: WordBankEntry[];
 }) {
   if (!selected) return <aside className="scene-inspector"><div className="scene-inspector-empty"><strong>No node selected</strong><span>Select a node in the graph to edit its data.</span></div></aside>;
@@ -427,6 +433,33 @@ function SceneInspector({
   }
 
   const node = scene[selected.sceneIndex];
+
+  if (isPhraseBuilderNode(node)) {
+    const update = <K extends keyof PhraseBuilderNode>(field: K, value: PhraseBuilderNode[K]) => onChange(selected.sceneIndex, { ...node, [field]: value });
+    const referencedIds = [...new Set(scene.flatMap((item) => isDialogueNode(item) ? (item.word_ids ?? []) : []))];
+    const referencedWords = referencedIds.map((id) => wordBank.find((word) => word.id === id)).filter(Boolean) as WordBankEntry[];
+    const regenerateChoices = (answer: string[]) => {
+      const correct = [...new Set(answer.filter(Boolean))];
+      const pool = referencedWords.filter((word) => !correct.includes(word.akeanon));
+      const distractors = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(2, pool.length)).map((word) => word.akeanon);
+      return [...correct, ...distractors].sort(() => Math.random() - 0.5);
+    };
+    const setAnswer = (answer: string[]) => onChange(selected.sceneIndex, { ...node, answer, choices: regenerateChoices(answer) });
+    return (<aside className="scene-inspector">
+      <div className="scene-inspector-header"><span>PHRASE BUILDER</span><strong>Node #{selected.sceneIndex}</strong><small>Construct a sentence from word choices</small></div>
+      <div className="scene-inspector-body">
+        <Field label="Prompt"><textarea value={node.prompt} onChange={(e) => update("prompt", e.target.value)} rows={5} placeholder="What should the player construct?" /></Field>
+        <Field label="Correct Answer"><div className="phrase-answer-list">
+          {node.answer.map((word, index) => <div className="phrase-answer-row" key={index}><span>{index + 1}</span><select value={word} onChange={(e) => { const answer=[...node.answer]; answer[index]=e.target.value; setAnswer(answer); }}><option value="">Select a word…</option>{wordBank.map((entry)=><option key={entry.id} value={entry.akeanon}>{entry.akeanon} · {entry.id}</option>)}</select><button type="button" onClick={()=>setAnswer(node.answer.filter((_,i)=>i!==index))}>×</button></div>)}
+          <button type="button" onClick={()=>setAnswer([...node.answer,""])}>+ Add answer word</button>
+        </div></Field>
+        <Field label="Choices"><div className="phrase-choice-list">{node.choices.map((word,i)=><span className="word-id-chip" key={word+i}><span>{word}</span></span>)}</div><small>Correct answer words + 1–2 random words already referenced in this scene.</small><button type="button" onClick={()=>update("choices",regenerateChoices(node.answer))}>↻ Regenerate distractors</button></Field>
+        <Field label="Translation"><textarea value={node.translation ?? ""} onChange={(e)=>update("translation",e.target.value||undefined)} rows={4}/></Field>
+        <Field label="Next"><select value={node.next ?? ""} onChange={(e)=>update("next",e.target.value===""?null:Number(e.target.value))}><option value="">End</option>{scene.map((_,i)=><option key={i} value={i}>Node #{i} — {title(scene[i],i)}</option>)}</select></Field>
+        <div className="scene-inspector-actions"><button type="button" onClick={()=>onAdd(selected.sceneIndex)}>+ Dialogue Node</button><button type="button" onClick={()=>onAddPhraseBuilder(selected.sceneIndex)}>+ Phrase Builder</button><button type="button" className="danger" onClick={()=>onDelete(selected.sceneIndex)}>Delete</button></div>
+      </div></aside>);
+  }
+
   if (isStartRouter(node)) {
     return (
       <aside className="scene-inspector">
@@ -635,9 +668,9 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
                 }
                 onSelect(visual.kind === "choice" ? { kind: "choice", sceneIndex: visual.sceneIndex, choiceIndex: visual.choiceIndex! } : { kind: "scene", sceneIndex: visual.sceneIndex });
               }}>
-                <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
+                <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isPhraseBuilderNode(source) ? "PHRASE BUILDER" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
                 <strong>{visual.kind === "choice" ? label || "Empty choice" : label}</strong>
-                <small>{visual.kind === "choice" ? `→ ${source && isDialogueNode(source) && source.choices?.[visual.choiceIndex!]?.next !== null ? `Node #${source.choices![visual.choiceIndex!].next}` : "End"}` : `#${visual.sceneIndex}`}</small>
+                <small>{visual.kind === "choice" ? `→ ${source && isDialogueNode(source) && source.choices?.[visual.choiceIndex!]?.next !== null ? `Node #${source.choices![visual.choiceIndex!].next}` : "End"}` : isPhraseBuilderNode(source) && source.next !== null ? `→ Node #${source.next}` : `#${visual.sceneIndex}`}</small>
               </button>
             );
           })}
@@ -668,11 +701,13 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
     onChange(next);
   }
 
+  function addPhraseBuilder(index: number) { if (!sceneData) return; const insert=index+1; const shift=(v:number|null)=>v!==null&&v>=insert?v+1:v; const next=sceneData.map((node):Scene[number]=>isDialogueNode(node)?{...node,next:shift(node.next),choices:node.choices?.map(c=>({...c,next:shift(c.next)}))}:isPhraseBuilderNode(node)?{...node,next:shift(node.next)}:node); next.splice(insert,0,{type:"phrase_builder",prompt:"",choices:[],answer:[],next:null}); onChange(next); setSelected({kind:"scene",sceneIndex:insert}); }
+
   function addNode(index: number) {
     if (!sceneData) return;
     const insert = index + 1;
     const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
-    const next = sceneData.map((node): Scene[number] => isDialogueNode(node) ? { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : node);
+    const next = sceneData.map((node): Scene[number] => isDialogueNode(node) ? { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : isPhraseBuilderNode(node) ? { ...node, next: shift(node.next) } : node);
     next.splice(insert, 0, { speaker: "", text: "", next: null, word_ids: [] });
     onChange(next);
     setSelected({ kind: "scene", sceneIndex: insert });
@@ -684,17 +719,18 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
     if (!isDialogueNode(node)) return;
     const insert = index + 1;
     const shift = (v: number | null) => v !== null && v >= insert ? v + 1 : v;
-    const next = sceneData.map((item): Scene[number] => isDialogueNode(item) ? { ...item, next: shift(item.next), choices: item.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : item);
+    const next = sceneData.map((item): Scene[number] => isDialogueNode(item) ? { ...item, next: shift(item.next), choices: item.choices?.map((c) => ({ ...c, next: shift(c.next) })) } : isPhraseBuilderNode(item) ? { ...item, next: shift(item.next) } : item);
     next.splice(insert, 0, { ...node, next: shift(node.next), choices: node.choices?.map((c) => ({ ...c, next: shift(c.next) })) });
     onChange(next);
     setSelected({ kind: "scene", sceneIndex: insert });
   }
 
   function deleteNode(index: number) {
-    if (!sceneData || !isDialogueNode(sceneData[index])) return;
+    if (!sceneData || (!isDialogueNode(sceneData[index]) && !isPhraseBuilderNode(sceneData[index]))) return;
     const next = sceneData.filter((_, i) => i !== index).map((node): Scene[number] => {
-      if (!isDialogueNode(node)) return node;
       const fix = (v: number | null) => v === index ? null : v !== null && v > index ? v - 1 : v;
+      if (isPhraseBuilderNode(node)) return { ...node, next: fix(node.next) };
+      if (!isDialogueNode(node)) return node;
       return { ...node, next: fix(node.next), choices: node.choices?.map((c) => ({ ...c, next: fix(c.next) })) };
     });
     onChange(next);
@@ -724,7 +760,7 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
       ) : (
         <div className="scene-editor-body">
           <SceneMap scene={sceneData!} selected={selected} onSelect={setSelected} />
-          <SceneInspector scene={sceneData!} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} wordBank={wordBank} />
+          <SceneInspector scene={sceneData!} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} onAddPhraseBuilder={addPhraseBuilder} wordBank={wordBank} />
         </div>
       )}
     </div>
