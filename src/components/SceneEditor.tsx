@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import wordBank from "../data/word_bank.json";
 import type { Scene, IdlePool, DialogueNode as DialogueNodeType, Choice, StartRouter } from "../types/content";
 import { resolveWordReferences, syncWordIdsFromText, type WordBankReferenceEntry } from "../utils/wordReferences";
 
