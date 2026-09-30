@@ -74,7 +74,11 @@ function edges(scene: Scene): Edge[] {
       if (scene[next]) result.push({ from: sceneId(i), to: sceneId(next) });
       return;
     }
-    if (isPhraseBuilderNode(node)) {\n      if (node.success !== null && scene[node.success]) result.push({ from: sceneId(i), to: sceneId(node.success) });\n      if (node.failure !== null && scene[node.failure]) result.push({ from: sceneId(i), to: sceneId(node.failure) });\n      return;\n    }
+    if (isPhraseBuilderNode(node)) {
+      if (node.success !== null && scene[node.success]) result.push({ from: sceneId(i), to: sceneId(node.success) });
+      if (node.failure !== null && scene[node.failure]) result.push({ from: sceneId(i), to: sceneId(node.failure) });
+      return;
+    }
     if (!isDialogueNode(node)) return;
     if (node.choices?.length) {
       node.choices.forEach((choice, j) => {
@@ -135,7 +139,12 @@ function autoLayout(scene: Scene): Record<string, Point> {
       continue;
     }
 
-    if (isPhraseBuilderNode(node)) {\n      [node.success, node.failure].forEach((next) => {\n        if (next !== null && scene[next] && !column.has(next)) { column.set(next, currentColumn + 1); gridRow.set(next, currentRow); queue.push(next); }\n      });\n      continue;\n    }
+    if (isPhraseBuilderNode(node)) {
+      [node.success, node.failure].forEach((next) => {
+        if (next !== null && scene[next] && !column.has(next)) { column.set(next, currentColumn + 1); gridRow.set(next, currentRow); queue.push(next); }
+      });
+      continue;
+    }
     if (!isDialogueNode(node)) continue;
 
     if (node.choices?.length) {
@@ -185,7 +194,9 @@ function autoLayout(scene: Scene): Record<string, Point> {
 
   // Ordinary dialogue -> dialogue remains a straight horizontal chain.
   scene.forEach((node, sceneIndex) => {
-    if ((!isDialogueNode(node) && !isPhraseBuilderNode(node)) || (isDialogueNode(node) && node.choices?.length)) return;\n    if (isPhraseBuilderNode(node)) return;\n    if (node.next === null || !scene[node.next]) return;
+    if ((!isDialogueNode(node) && !isPhraseBuilderNode(node)) || (isDialogueNode(node) && node.choices?.length)) return;
+    if (isPhraseBuilderNode(node)) return;
+    if (node.next === null || !scene[node.next]) return;
 
     const source = positions[sceneId(sceneIndex)];
     const target = positions[sceneId(node.next)];
