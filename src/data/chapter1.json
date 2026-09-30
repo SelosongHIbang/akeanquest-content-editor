@@ -121,7 +121,13 @@
     {
       "speaker": "Lola Jonabel",
       "text": "Just follow along. mayad nga agahon.",
-      "next": 5
+      "next": 6
+    },
+    {
+      "speaker": "",
+      "text": "",
+      "next": null,
+      "word_ids": []
     },
     {
       "speaker": "Lola Jonabel",
@@ -129,15 +135,15 @@
       "choices": [
         {
           "label": "Mayad nga agahon! Did I say it right, Grandma?",
-          "next": 6
+          "next": 7
         },
         {
           "label": "Mayad nga agahon? I'll practice more.",
-          "next": 6
+          "next": 7
         },
         {
           "label": "This is going to take forever, I don't think I can do this.",
-          "next": 7
+          "next": 8
         }
       ],
       "next": null,
@@ -146,22 +152,22 @@
     {
       "speaker": "Lola Jonabel",
       "text": "Almost! You're closer than you think, Apo.",
-      "next": 8
-    },
-    {
-      "speaker": "Lola Jonabel",
-      "text": "Practice makes it stick. We have time.",
-      "next": 8
-    },
-    {
-      "speaker": "Lola Jonabel",
-      "text": "Don't rush yourself, Apo. Even I forgot some words — and this is my home.",
       "next": 9
     },
     {
       "speaker": "Lola Jonabel",
+      "text": "Practice makes it stick. We have time.",
+      "next": 9
+    },
+    {
+      "speaker": "Lola Jonabel",
+      "text": "Don't rush yourself, Apo. Even I forgot some words — and this is my home.",
+      "next": 10
+    },
+    {
+      "speaker": "Lola Jonabel",
       "text": "Kamusta ka? — that one is easy, you already know it from Tagalog.",
-      "next": 10,
+      "next": 11,
       "translation": "How are you? — same line, spoken to greet.",
       "word_ids": [
         "w083"
