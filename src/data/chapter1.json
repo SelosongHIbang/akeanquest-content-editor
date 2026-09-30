@@ -156,9 +156,10 @@
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "Almost! You're closer than you think, Apo.",
+      "text": "Well Done Apo.",
       "next": 8,
-      "type": "dialogue"
+      "type": "dialogue",
+      "word_ids": []
     },
     {
       "speaker": "Lola Jonabel",
