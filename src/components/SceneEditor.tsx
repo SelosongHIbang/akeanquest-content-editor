@@ -178,6 +178,48 @@ function autoLayout(scene: Scene): Record<string, Point> {
     });
   }
 
+  // If a node has incoming nodes in different columns, it belongs in
+  // the column immediately after the rightmost incoming node.
+  const incomingColumns = new Map<string, number[]>();
+
+  visuals(scene).forEach((visual) => {
+    outgoing(visual.id).forEach((child) => {
+      const columns = incomingColumns.get(child) ?? [];
+      columns.push(column.get(visual.id) ?? 0);
+      incomingColumns.set(child, columns);
+    });
+  });
+
+  incomingColumns.forEach((incoming, target) => {
+    if (incoming.length < 2) return;
+    const rightmostIncoming = Math.max(...incoming);
+    column.set(target, rightmostIncoming + 1);
+  });
+
+  // Propagate the resulting column change through downstream nodes while
+  // preserving their existing row assignments.
+  for (let pass = 0; pass < visuals(scene).length; pass += 1) {
+    visuals(scene).forEach((visual) => {
+      const parentColumn = column.get(visual.id);
+      if (parentColumn === undefined) return;
+
+      outgoing(visual.id).forEach((child) => {
+        const childIncoming = incomingColumns.get(child) ?? [];
+        if (childIncoming.length >= 2) {
+          const rightmostIncoming = Math.max(
+            ...childIncoming.map((_, index) => {
+              const parent = visuals(scene).find((candidate) => outgoing(candidate.id).includes(child));
+              return parent ? column.get(parent.id) ?? 0 : 0;
+            }),
+          );
+          column.set(child, rightmostIncoming + 1);
+        } else if (!column.has(child)) {
+          column.set(child, parentColumn + 1);
+        }
+      });
+    });
+  }
+
   // Keep disconnected nodes visible without introducing another positioning
   // rule for connected nodes.
   let fallbackColumn = Math.max(...column.values(), 0) + 1;
