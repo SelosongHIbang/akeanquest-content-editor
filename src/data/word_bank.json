@@ -12,16 +12,16 @@
     {
       "id": "w002",
       "akeanon": "Aklan",
-      "category": "Noun (n)",
+      "category": "Proper Noun (N)",
       "area": "chapter1",
-      "gloss": "A",
+      "gloss": "Province in the Philippines",
       "verified": false,
       "source": ""
     },
     {
       "id": "w003",
       "akeanon": "Ako",
-      "category": "",
+      "category": "Pronoun (pro)",
       "area": "chapter1",
       "gloss": "I / me",
       "verified": false,
@@ -30,7 +30,7 @@
     {
       "id": "w004",
       "akeanon": "Ama",
-      "category": "",
+      "category": "Noun (n)",
       "area": "chapter1",
       "gloss": "father",
       "verified": false,
@@ -39,7 +39,7 @@
     {
       "id": "w005",
       "akeanon": "Ap-at",
-      "category": "",
+      "category": "Proper Noun (N)",
       "area": "chapter1",
       "gloss": "four",
       "verified": false,
@@ -48,7 +48,7 @@
     {
       "id": "w006",
       "akeanon": "Apo",
-      "category": "",
+      "category": "Noun (n)",
       "area": "chapter1",
       "gloss": "grandchild / Grandchild",
       "verified": false,
