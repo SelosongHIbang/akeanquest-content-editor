@@ -101,227 +101,99 @@ function autoLayout(scene: Scene): Record<string, Point> {
   const START_X = TREE_PADDING;
   const START_Y = TREE_PADDING;
 
-  // Fixed semantic columns. Branches do NOT create additional horizontal
-  // depth. The important shape is:
-  //
-  //   Start -> Dialogue -> Prompt -> Choice -> Dialogue
-  //                                  |-> Choice -> Dialogue
-  //                                  |-> Choice -> Dialogue
-  //
-  // All choices from one prompt share one column, and all of their
-  // destinations share the next column. Downstream nodes continue from
-  // that destination column rather than pushing individual branches farther
-  // right.
-
-  const column = new Map<number, number>();
-  const gridRow = new Map<number, number>();
-
   if (!scene.length) return positions;
 
-  column.set(0, 0);
-  gridRow.set(0, 0);
+  // The only layout rule for now:
+  //
+  //   1. Every outgoing node is placed in the next column.
+  //   2. Outgoing nodes are placed on separate rows.
+  //   3. The first outgoing node starts on the same row as its parent.
+  //   4. Each following outgoing node occupies the next row.
+  //
+  // Choices are visual nodes, so a prompt's choices are simply its outgoing
+  // nodes. A choice's destination is then its own outgoing node.
 
-  // First assign structural columns using graph traversal.
-  const queue = [0];
-  while (queue.length) {
-    const index = queue.shift()!;
-    const node = scene[index];
-    const currentColumn = column.get(index) ?? 0;
-    const currentRow = gridRow.get(index) ?? 0;
+  const column = new Map<string, number>();
+  const row = new Map<string, number>();
+  const queue: string[] = [];
+
+  const outgoing = (id: string): string[] => {
+    if (id.startsWith("choice-")) {
+      const [, sceneIndexText, choiceIndexText] = id.split("-");
+      const sceneIndex = Number(sceneIndexText);
+      const choiceIndex = Number(choiceIndexText);
+      const node = scene[sceneIndex];
+
+      if (!isDialogueNode(node)) return [];
+      const next = node.choices?.[choiceIndex]?.next;
+      return next !== null && next !== undefined && scene[next]
+        ? [sceneId(next)]
+        : [];
+    }
+
+    const sceneIndex = Number(id.slice("scene-".length));
+    const node = scene[sceneIndex];
 
     if (isStartRouter(node)) {
       const next = node.start_index_if_flag.default;
-      if (scene[next] && !column.has(next)) {
-        column.set(next, currentColumn + 1);
-        gridRow.set(next, currentRow);
-        queue.push(next);
-      }
-      continue;
+      return scene[next] ? [sceneId(next)] : [];
     }
 
     if (isPhraseBuilderNode(node)) {
-      [node.success, node.failure].forEach((next) => {
-        if (next !== null && scene[next] && !column.has(next)) { column.set(next, currentColumn + 1); gridRow.set(next, currentRow); queue.push(next); }
-      });
-      continue;
+      return [node.success, node.failure]
+        .filter((next): next is number => next !== null && scene[next])
+        .map(sceneId);
     }
-    if (!isDialogueNode(node)) continue;
+
+    if (!isDialogueNode(node)) return [];
 
     if (node.choices?.length) {
-      // Prompt -> Choice -> destination: exactly two visual columns.
-      node.choices.forEach((choice, choiceIndex) => {
-        if (choice.next === null || !scene[choice.next]) return;
-
-        const target = choice.next;
-        const targetColumn = currentColumn + 2;
-        const center = (node.choices!.length - 1) / 2;
-        const targetRow = currentRow + (choiceIndex - center);
-
-        if (!column.has(target)) {
-          column.set(target, targetColumn);
-          gridRow.set(target, targetRow);
-          queue.push(target);
-        }
-      });
-    } else if (node.next !== null && scene[node.next]) {
-      if (!column.has(node.next)) {
-        column.set(node.next, currentColumn + 1);
-        gridRow.set(node.next, currentRow);
-        queue.push(node.next);
-      }
+      return node.choices.map((_, choiceIndex) => choiceId(sceneIndex, choiceIndex));
     }
+
+    return node.next !== null && scene[node.next]
+      ? [sceneId(node.next)]
+      : [];
+  };
+
+  const root = sceneId(0);
+  column.set(root, 0);
+  row.set(root, 0);
+  queue.push(root);
+
+  while (queue.length) {
+    const parent = queue.shift()!;
+    const parentColumn = column.get(parent)!;
+    const parentRow = row.get(parent)!;
+    const children = outgoing(parent);
+
+    children.forEach((child, childIndex) => {
+      // The first outgoing node stays on the parent's row. Each subsequent
+      // outgoing node moves exactly one row downward.
+      if (column.has(child)) return;
+
+      column.set(child, parentColumn + 1);
+      row.set(child, parentRow + childIndex);
+      queue.push(child);
+    });
   }
 
-  // Unconnected nodes: keep them in deterministic columns/rows.
+  // Keep disconnected nodes visible without introducing another positioning
+  // rule for connected nodes.
   let fallbackColumn = Math.max(...column.values(), 0) + 1;
   let fallbackRow = 0;
-  scene.forEach((_, index) => {
-    if (column.has(index)) return;
-    column.set(index, fallbackColumn++);
-    gridRow.set(index, fallbackRow++);
+
+  visuals(scene).forEach((visual) => {
+    if (column.has(visual.id)) return;
+    column.set(visual.id, fallbackColumn);
+    row.set(visual.id, fallbackRow++);
   });
 
-  // Normalize branch rows into a fixed integer grid.
-  const rows = [...new Set([...gridRow.values()].map((r) => Math.round(r)))].sort((a, b) => a - b);
-  const rowIndex = new Map(rows.map((r, i) => [r, i]));
-
-  scene.forEach((_, index) => {
-    positions[sceneId(index)] = {
-      x: START_X + (column.get(index) ?? 0) * STEP_X,
-      y: START_Y + (rowIndex.get(Math.round(gridRow.get(index) ?? 0)) ?? 0) * ROW_PITCH,
+  visuals(scene).forEach((visual) => {
+    positions[visual.id] = {
+      x: START_X + (column.get(visual.id) ?? 0) * STEP_X,
+      y: START_Y + (row.get(visual.id) ?? 0) * ROW_PITCH,
     };
-  });
-
-  // Branch destinations are positioned first. Any ordinary continuation from
-  // one of those destinations is then propagated onto the same row.
-  //
-  // This order matters: if a Phrase Builder moves its Failure destination
-  // down one row, the node that Failure points to must move down with it.
-  scene.forEach((node, sceneIndex) => {
-    if (!isPhraseBuilderNode(node)) return;
-
-    const source = positions[sceneId(sceneIndex)];
-    if (!source) return;
-
-    [node.success, node.failure].forEach((targetIndex, branchIndex) => {
-      if (targetIndex === null || !scene[targetIndex]) return;
-
-      const target = positions[sceneId(targetIndex)];
-      if (!target) return;
-
-      positions[sceneId(targetIndex)] = {
-        ...target,
-        x: source.x + STEP_X,
-        y: source.y + branchIndex * ROW_PITCH,
-      };
-    });
-  });
-
-  // A node with one ordinary predecessor stays on that predecessor's row.
-  // Run this after branch placement so the continuation follows a branch
-  // destination that was just moved.
-  for (let pass = 0; pass < scene.length; pass += 1) {
-    scene.forEach((node, sceneIndex) => {
-      if (!isDialogueNode(node) || node.choices?.length || node.next === null || !scene[node.next]) return;
-
-      const source = positions[sceneId(sceneIndex)];
-      const target = positions[sceneId(node.next)];
-      if (!source || !target) return;
-
-      positions[sceneId(node.next)] = {
-        ...target,
-        x: Math.max(target.x, source.x + STEP_X),
-        y: source.y,
-      };
-    });
-  }
-
-  // If multiple precursors point to the same scene node, follow the
-  // highest (topmost) precursor row. This is the merge rule: the destination
-  // belongs to the highest incoming branch rather than whichever precursor
-  // happened to be processed last.
-  const incoming = new Map<number, { x: number; y: number }[]>();
-
-  scene.forEach((node, sceneIndex) => {
-    const source = positions[sceneId(sceneIndex)];
-    if (!source) return;
-
-    if (isPhraseBuilderNode(node)) {
-      [node.success, node.failure].forEach((targetIndex) => {
-        if (targetIndex === null || !scene[targetIndex]) return;
-        const list = incoming.get(targetIndex) ?? [];
-        list.push({ x: source.x, y: source.y });
-        incoming.set(targetIndex, list);
-      });
-      return;
-    }
-
-    if (!isDialogueNode(node)) return;
-
-    if (node.choices?.length) {
-      node.choices.forEach((choice, choiceIndex) => {
-        if (choice.next === null || !scene[choice.next]) return;
-        const choiceY = source.y + choiceIndex * ROW_PITCH;
-        const list = incoming.get(choice.next) ?? [];
-        list.push({ x: source.x + STEP_X, y: choiceY });
-        incoming.set(choice.next, list);
-      });
-    } else if (node.next !== null && scene[node.next]) {
-      const list = incoming.get(node.next) ?? [];
-      list.push({ x: source.x, y: source.y });
-      incoming.set(node.next, list);
-    }
-  });
-
-  incoming.forEach((precursors, targetIndex) => {
-    if (precursors.length < 2) return;
-    const highest = precursors.reduce((top, precursor) => precursor.y < top.y ? precursor : top);
-    const target = positions[sceneId(targetIndex)];
-    if (!target) return;
-    positions[sceneId(targetIndex)] = {
-      ...target,
-      x: Math.max(target.x, highest.x + STEP_X),
-      y: highest.y,
-    };
-  });
-
-  // Choices are laid out last so a prompt that follows a branch uses its
-  // final row. Every choice starts from that prompt row and continues
-  // downward by one fixed row pitch.
-  scene.forEach((node, sceneIndex) => {
-    if (!isDialogueNode(node) || !node.choices?.length) return;
-
-    const prompt = positions[sceneId(sceneIndex)];
-    if (!prompt) return;
-
-    node.choices.forEach((choice, choiceIndex) => {
-      const choiceY = prompt.y + choiceIndex * ROW_PITCH;
-
-      positions[choiceId(sceneIndex, choiceIndex)] = {
-        x: prompt.x + NODE_WIDTH + COLUMN_GAP,
-        y: choiceY,
-      };
-
-      if (choice.next !== null && scene[choice.next]) {
-        const target = positions[sceneId(choice.next)];
-        if (!target) return;
-
-        positions[sceneId(choice.next)] = {
-          ...target,
-          x: prompt.x + STEP_X * 2,
-          y: choiceY,
-        };
-      }
-    });
-  });
-
-  visuals(scene).forEach((visual, index) => {
-    if (!positions[visual.id]) {
-      positions[visual.id] = {
-        x: START_X + (index + 1) * STEP_X,
-        y: START_Y + index * ROW_PITCH,
-      };
-    }
   });
 
   return positions;
