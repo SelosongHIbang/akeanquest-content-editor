@@ -8,6 +8,7 @@ import chapter6 from "./data/chapter6.json";
 import wordBankData from "./data/word_bank.json";
 import WordBankEditor from "./components/WordBankEditor";
 import type { Chapter, Scene } from "./types/content";
+import { resolveChapterWordReferences } from "./utils/wordReferences";
 
 type WordEntry = typeof wordBankData.words[number];
 type WordBank = { words: WordEntry[] };
@@ -27,7 +28,7 @@ const bundledChapters: Chapters = {
 };
 
 function App() {
-  const [chapters, setChapters] = useState<Chapters>(() => bundledChapters);
+  const [chapters, setChapters] = useState<Chapters>(() => resolveChapterWordReferences(bundledChapters, wordBankData.words));
   const [selectedChapterId, setSelectedChapterId] = useState("chapter1");
   const [selectedScene, setSelectedScene] = useState<SelectedScene>(null);
   const [activeTab, setActiveTab] = useState<"scenes" | "word-bank">("scenes");
@@ -71,6 +72,7 @@ function App() {
   useEffect(() => {
     if (previousWordBank.current && previousWordBank.current !== wordBank) {
       queueAutosave("word_bank.json", wordBank);
+      setChapters((current) => resolveChapterWordReferences(current, wordBank.words));
     }
     previousWordBank.current = wordBank;
   }, [wordBank]);
@@ -128,7 +130,7 @@ function App() {
       </header>
 
       <div className="editor-workspace">
-        {activeTab === "scenes" ? (<><Sidebar chapters={chapters} selectedChapterId={selectedChapterId} selectedScene={selectedScene} onChapterChange={(chapterId) => { setSelectedChapterId(chapterId); setSelectedScene(null); }} onSelect={setSelectedScene} onAddScene={handleAddScene} /><main className="editor-main"><SceneEditor key={selectedScene ? selectedScene.chapterId + ":" + selectedScene.sceneName : "no-scene"} name={selectedScene?.sceneName ?? "No scene selected"} data={selectedData ?? null} onChange={(updatedData) => { if (!selectedScene) return; setChapters({ ...chapters, [selectedScene.chapterId]: { ...chapters[selectedScene.chapterId], [selectedScene.sceneName]: updatedData } }); }} onSave={handleSave} onArchive={handleArchiveScene} /></main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
+        {activeTab === "scenes" ? (<><Sidebar chapters={chapters} selectedChapterId={selectedChapterId} selectedScene={selectedScene} onChapterChange={(chapterId) => { setSelectedChapterId(chapterId); setSelectedScene(null); }} onSelect={setSelectedScene} onAddScene={handleAddScene} /><main className="editor-main"><SceneEditor key={selectedScene ? selectedScene.chapterId + ":" + selectedScene.sceneName : "no-scene"} name={selectedScene?.sceneName ?? "No scene selected"} data={selectedData ?? null} onChange={(updatedData) => { if (!selectedScene) return; setChapters({ ...chapters, [selectedScene.chapterId]: { ...chapters[selectedScene.chapterId], [selectedScene.sceneName]: updatedData } }); }} onSave={handleSave} onArchive={handleArchiveScene} wordBank={wordBank.words} /></main></>) : (<main className="editor-main"><WordBankEditor data={wordBank} onChange={setWordBank} /></main>)}
       </div>
     </div>
   );
