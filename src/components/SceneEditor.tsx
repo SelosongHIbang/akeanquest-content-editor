@@ -442,6 +442,12 @@ function SceneInspector({
 
   if (!isDialogueNode(node)) return null;
   const update = <K extends keyof DialogueNodeType>(field: K, value: DialogueNodeType[K]) => onChange(selected.sceneIndex, { ...node, [field]: value });
+  const updateText = (text: string) => onChange(selected.sceneIndex, {
+    ...node,
+    text,
+    word_ids: syncWordIdsFromText(text, node.word_ids, wordBank),
+  });
+  const wordResolution = resolveWordReferences(node.text, wordBank);
   return (
     <aside className="scene-inspector">
       <div className="scene-inspector-header"><span>{node.choices?.length ? "USER PROMPT" : "DIALOGUE"}</span><strong>Node #{selected.sceneIndex}</strong><small>{node.speaker || "No speaker"}</small></div>
