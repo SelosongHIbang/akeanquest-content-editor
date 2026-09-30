@@ -12,7 +12,7 @@
       "next": 2,
       "translation": "I really miss Aklan.",
       "word_ids": [
-        "w128"
+        "w053"
       ]
     },
     {
@@ -65,7 +65,7 @@
       "text": "Maybe. But some things are worth being tired for.",
       "next": 9,
       "word_ids": [
-        "w012"
+        "w084"
       ]
     },
     {
@@ -92,7 +92,7 @@
       "next": 3,
       "translation": "Good morning in Aklan.",
       "word_ids": [
-        "w129"
+        "w057"
       ]
     },
     {
@@ -145,7 +145,7 @@
       "next": 10,
       "translation": "How are you? — same line, spoken to greet.",
       "word_ids": [
-        "w011"
+        "w083"
       ]
     },
     {
@@ -232,7 +232,7 @@
       "text": "Sunod kamo. I'll show you the town.",
       "next": null,
       "word_ids": [
-        "w130"
+        "w059"
       ]
     },
     {
@@ -259,7 +259,7 @@
       "text": "Ako — that's I. Ikaw — you. Siya — he or she.",
       "next": 3,
       "word_ids": [
-        "w063"
+        "w092"
       ]
     },
     {
@@ -272,7 +272,7 @@
       "text": "Kami — we, but not you. Kita — we, and that includes you. Kamo — you all. Sanda — they.",
       "next": 5,
       "word_ids": [
-        "w067"
+        "w104"
       ]
     },
     {
@@ -314,7 +314,7 @@
       "text": "Tatay — father. Nanay — mother. Unga — child. Easy ones, you'll hear these a lot.",
       "next": 10,
       "word_ids": [
-        "w008"
+        "w033"
       ]
     },
     {
@@ -322,7 +322,7 @@
       "text": "Isa, daywa, tatlo, apat, lima — count with me. Point at each one.",
       "next": 11,
       "word_ids": [
-        "w055"
+        "w064"
       ]
     },
     {
@@ -354,7 +354,7 @@
         "speaker": "Lola Jonabel",
         "text": "Player, do not forget to write to your Lola back home too. Distance should never mean silence.",
         "word_ids": [
-          "w128"
+          "w053"
         ]
       },
       {
@@ -440,14 +440,14 @@
         "speaker": "Lola Susan",
         "text": "Halong, apo — mainit gid diri sa Aklan, indi pareho sa America.",
         "word_ids": [
-          "w128"
+          "w053"
         ]
       },
       {
         "speaker": "Lola Susan",
         "text": "Kung gutom ka, sabihon mo lang. Damo pagkaon sa balay.",
         "word_ids": [
-          "w006"
+          "w019"
         ]
       }
     ],
@@ -497,7 +497,7 @@
         "speaker": "Rose",
         "text": "Magtuon ka gid, ha. Indi lang basta-basta.",
         "word_ids": [
-          "w129"
+          "w057"
         ]
       },
       {
