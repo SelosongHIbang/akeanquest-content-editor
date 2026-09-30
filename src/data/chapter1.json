@@ -8,10 +8,12 @@
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "Nahidlaw gid ako sa Aklan.",
+      "text": "\\Nahidlaw gid ako sa Aklan.",
       "next": 2,
       "translation": "I really miss Aklan.",
-      "word_ids": []
+      "word_ids": [
+        "w173"
+      ]
     },
     {
       "speaker": "Player",
