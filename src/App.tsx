@@ -8,6 +8,7 @@ import chapter6 from "./data/chapter6.json";
 import wordBankData from "./data/word_bank.json";
 import WordBankEditor from "./components/WordBankEditor";
 import type { Chapter, Scene } from "./types/content";
+import { normalizeSceneTypes } from "./types/content";
 import { resolveChapterWordReferences } from "./utils/wordReferences";
 
 type WordEntry = typeof wordBankData.words[number];
@@ -27,8 +28,15 @@ const bundledChapters: Chapters = {
   chapter6: chapter6 as Chapter,
 };
 
+const normalizedBundledChapters: Chapters = Object.fromEntries(
+  Object.entries(bundledChapters).map(([chapterId, chapter]) => [
+    chapterId,
+    Object.fromEntries(Object.entries(chapter).map(([name, data]) => [name, Array.isArray(data) ? normalizeSceneTypes(data) : data])) as Chapter,
+  ])
+);
+
 function App() {
-  const [chapters, setChapters] = useState<Chapters>(() => resolveChapterWordReferences(bundledChapters, wordBankData.words));
+  const [chapters, setChapters] = useState<Chapters>(() => resolveChapterWordReferences(normalizedBundledChapters, wordBankData.words));
   const [selectedChapterId, setSelectedChapterId] = useState("chapter1");
   const [selectedScene, setSelectedScene] = useState<SelectedScene>(null);
   const [activeTab, setActiveTab] = useState<"scenes" | "word-bank">("scenes");
@@ -94,7 +102,7 @@ function App() {
     if (currentChapter[sceneName]) { alert("A scene with that name already exists."); return; }
     const newScene: Scene = [
       { type: "start_router", start_index_if_flag: { default: 1 } },
-      { speaker: "", text: "", next: null, word_ids: [] },
+      { type: "dialogue", speaker: "", text: "", next: null, word_ids: [] },
     ];
     setChapters({
       ...chapters,
