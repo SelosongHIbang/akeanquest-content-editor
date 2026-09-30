@@ -275,6 +275,29 @@ function autoLayout(scene: Scene): Record<string, Point> {
     });
   });
 
+  // Give Phrase Builder success/failure branches separate rows so their
+  // destination nodes never sit directly on top of each other.
+  scene.forEach((node, sceneIndex) => {
+    if (!isPhraseBuilderNode(node)) return;
+    const source = positions[sceneId(sceneIndex)];
+    if (!source) return;
+
+    const targets = [node.success, node.failure].filter(
+      (value, index, values): value is number => value !== null && scene[value] !== undefined && values.indexOf(value) === index,
+    );
+
+    targets.forEach((targetIndex, branchIndex) => {
+      const target = positions[sceneId(targetIndex)];
+      if (!target) return;
+      const offset = targets.length === 1 ? 0 : (branchIndex === 0 ? -0.5 : 0.5) * ROW_PITCH;
+      positions[sceneId(targetIndex)] = {
+        ...target,
+        x: Math.max(target.x, source.x + STEP_X),
+        y: source.y + offset,
+      };
+    });
+  });
+
   visuals(scene).forEach((visual, index) => {
     if (!positions[visual.id]) {
       positions[visual.id] = {
