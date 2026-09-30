@@ -13,6 +13,7 @@ export type PhraseBuilderNode = {
 };
 
 export type DialogueNode = {
+  type: "dialogue";
   speaker: string;
   text: string;
   next: number | null;
@@ -23,6 +24,7 @@ export type DialogueNode = {
 };
 
 export type StartRouter = {
+  type: "start_router";
   start_index_if_flag: Record<string, number>;
   type: string;
 };
@@ -42,3 +44,15 @@ export type IdlePool = {
 };
 
 export type Chapter = Record<string, Scene | IdlePool>;
+
+export function normalizeSceneTypes(scene: Scene): Scene {
+  return scene.map((node) => {
+    if ("speaker" in node && "text" in node && !("type" in node)) {
+      return { ...node, type: "dialogue" } as DialogueNode;
+    }
+    if ("start_index_if_flag" in node && !("type" in node)) {
+      return { ...node, type: "start_router" } as StartRouter;
+    }
+    return node;
+  });
+}
