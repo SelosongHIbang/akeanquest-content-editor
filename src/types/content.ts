@@ -3,6 +3,15 @@ export type Choice = {
   next: number | null;
 };
 
+export type PhraseBuilderNode = {
+  type: "phrase_builder";
+  prompt: string;
+  choices: string[];
+  answer: string[];
+  next: number | null;
+  translation?: string;
+};
+
 export type DialogueNode = {
   speaker: string;
   text: string;
@@ -18,7 +27,7 @@ export type StartRouter = {
   type: string;
 };
 
-export type Scene = Array<StartRouter | DialogueNode>;
+export type Scene = Array<StartRouter | DialogueNode | PhraseBuilderNode>;
 
 export type IdleEntry = {
   speaker: string;
