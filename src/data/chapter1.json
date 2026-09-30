@@ -142,11 +142,13 @@
       "prompt": "Can you repeat it?",
       "choices": [
         "agahon",
-        "mayad",
-        "nga"
+        "nga",
+        "ikaw/ka",
+        "mayad"
       ],
       "answer": [
         "mayad",
+        "nga",
         ""
       ],
       "next": null
