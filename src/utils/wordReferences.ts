@@ -1,9 +1,11 @@
+import type { Chapter, DialogueNode, IdleEntry, IdlePool, Scene } from "../types/content";
+
 export type WordBankReferenceEntry = {
   id: string;
   akeanon: string;
 };
 
-const WORD_REFERENCE_RE = /\\([^\\\\s,.;!?()[\]{}"']+)/g;
+const WORD_REFERENCE_RE = /\\([^\s\\,.;!?()[\]{}"']+)/g;
 
 export function extractWordReferences(text: string): string[] {
   const refs: string[] = [];
@@ -55,64 +57,66 @@ export function syncWordIdsFromText(
   currentWordIds: string[] | undefined,
   wordBank: WordBankReferenceEntry[],
 ): string[] {
-  const references = extractWordReferences(text);
-  if (!references.length) return currentWordIds ?? [];
+  if (!extractWordReferences(text).length) return currentWordIds ?? [];
   return resolveWordReferences(text, wordBank).wordIds;
 }
 
-export function resolveChapterWordReferences<T extends Record<string, any>>(
-  chapters: T,
+function syncDialogueNode(node: DialogueNode, wordBank: WordBankReferenceEntry[]): DialogueNode {
+  const wordIds = syncWordIdsFromText(node.text, node.word_ids, wordBank);
+  return JSON.stringify(wordIds) === JSON.stringify(node.word_ids ?? [])
+    ? node
+    : { ...node, word_ids: wordIds };
+}
+
+function resolveScene(scene: Scene, wordBank: WordBankReferenceEntry[]): Scene {
+  return scene.map((node) => (
+    "speaker" in node && "text" in node ? syncDialogueNode(node, wordBank) : node
+  ));
+}
+
+function resolveIdlePool(pool: IdlePool, wordBank: WordBankReferenceEntry[]): IdlePool {
+  const resolveEntry = (entry: IdleEntry) => {
+    const wordIds = syncWordIdsFromText(entry.text, entry.word_ids, wordBank);
+    return JSON.stringify(wordIds) === JSON.stringify(entry.word_ids ?? [])
+      ? entry
+      : { ...entry, word_ids: wordIds };
+  };
+
+  return {
+    low: pool.low.map(resolveEntry),
+    med: pool.med.map(resolveEntry),
+    high: pool.high.map(resolveEntry),
+  };
+}
+
+function sameData(a: Scene | IdlePool, b: Scene | IdlePool): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function resolveChapterWordReferences(
+  chapters: Record<string, Chapter>,
   wordBank: WordBankReferenceEntry[],
-): T {
+): Record<string, Chapter> {
   let changed = false;
 
-  const nextChapters = Object.fromEntries(
-    Object.entries(chapters).map(([chapterId, chapter]) => {
-      let chapterChanged = false;
-      const nextChapter = Object.fromEntries(
-        Object.entries(chapter as Record<string, any>).map(([name, data]) => {
-          if (Array.isArray(data)) {
-            let sceneChanged = false;
-            const nextScene = data.map((node: any) => {
-              if (!node || typeof node !== "object" || typeof node.text !== "string") return node;
-              const nextIds = syncWordIdsFromText(node.text, node.word_ids, wordBank);
-              if (JSON.stringify(nextIds) === JSON.stringify(node.word_ids ?? [])) return node;
-              sceneChanged = true;
-              return { ...node, word_ids: nextIds };
-            });
-            if (!sceneChanged) return [name, data];
-            chapterChanged = true;
-            return [name, nextScene];
-          }
+  const nextChapters: Record<string, Chapter> = {};
 
-          if (!data || typeof data !== "object") return [name, data];
+  for (const [chapterId, chapter] of Object.entries(chapters)) {
+    let chapterChanged = false;
+    const nextChapter: Chapter = {};
 
-          let poolChanged = false;
-          const nextPool = { ...data };
-          for (const tier of ["low", "med", "high"]) {
-            const entries = data[tier];
-            if (!Array.isArray(entries)) continue;
-            const nextEntries = entries.map((entry: any) => {
-              if (!entry || typeof entry !== "object" || typeof entry.text !== "string") return entry;
-              const nextIds = syncWordIdsFromText(entry.text, entry.word_ids, wordBank);
-              if (JSON.stringify(nextIds) === JSON.stringify(entry.word_ids ?? [])) return entry;
-              poolChanged = true;
-              return { ...entry, word_ids: nextIds };
-            });
-            nextPool[tier] = nextEntries;
-          }
+    for (const [name, data] of Object.entries(chapter)) {
+      const nextData = Array.isArray(data)
+        ? resolveScene(data, wordBank)
+        : resolveIdlePool(data, wordBank);
 
-          if (!poolChanged) return [name, data];
-          chapterChanged = true;
-          return [name, nextPool];
-        }),
-      );
+      nextChapter[name] = nextData;
+      if (!sameData(data, nextData)) chapterChanged = true;
+    }
 
-      if (!chapterChanged) return [chapterId, chapter];
-      changed = true;
-      return [chapterId, nextChapter];
-    }),
-  ) as T;
+    nextChapters[chapterId] = nextChapter;
+    if (chapterChanged) changed = true;
+  }
 
   return changed ? nextChapters : chapters;
 }
