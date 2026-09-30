@@ -487,8 +487,8 @@ function SceneInspector({
           prompt: node.text,
           choices,
           answer,
-          success: node.success,
-          failure: node.failure,
+          success: node.next,
+          failure: null,
           translation: node.translation,
         });
       } else if (isStartRouter(node)) {
