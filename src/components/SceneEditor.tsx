@@ -397,7 +397,7 @@ function SceneInspector({
 }: {
   scene: Scene;
   selected: SelectedNode | null;
-  onChange: (index: number, node: DialogueNodeType | StartRouter) => void;
+  onChange: (index: number, node: DialogueNodeType | PhraseBuilderNode | StartRouter) => void;
   onAdd: (index: number) => void;
   onDuplicate: (index: number) => void;
   onDelete: (index: number) => void;
@@ -688,7 +688,7 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive, w
   );
   const hasSelection = data !== null;
 
-  function updateNode(index: number, node: DialogueNodeType | StartRouter) {
+  function updateNode(index: number, node: DialogueNodeType | PhraseBuilderNode | StartRouter) {
     if (!sceneData) return;
     const next = [...sceneData];
     next[index] = node;
