@@ -152,42 +152,36 @@
         "agahon"
       ],
       "next": 6,
-      "success": 6
+      "success": 6,
+      "failure": 7
     },
     {
       "speaker": "Lola Jonabel",
-      "text": "Well done apo.",
+      "text": "Well done \\apo.",
+      "next": null,
+      "type": "dialogue",
+      "word_ids": [
+        "w019"
+      ]
+    },
+    {
+      "speaker": "Lola Jonabel",
+      "text": "Practice makes it stick. We have time. ",
       "next": 8,
       "type": "dialogue",
       "word_ids": []
-    },
-    {
-      "speaker": "Lola Jonabel",
-      "text": "Practice makes it stick. We have time.",
-      "next": 8,
-      "type": "dialogue"
-    },
-    {
-      "speaker": "Lola Jonabel",
-      "text": "Don't rush yourself, Apo. Even I forgot some words — and this is my home.",
-      "next": 9,
-      "type": "dialogue"
-    },
-    {
-      "speaker": "Lola Jonabel",
-      "text": "Kamusta ka? — that one is easy, you already know it from Tagalog.",
-      "next": 10,
-      "translation": "How are you? — same line, spoken to greet.",
-      "word_ids": [
-        "w083"
-      ],
-      "type": "dialogue"
     },
     {
       "speaker": "Papa Jobert",
       "text": "Come on, Aunt Susan is outside already. Let's not keep her waiting.",
       "next": null,
       "type": "dialogue"
+    },
+    {
+      "speaker": "",
+      "text": "",
+      "next": 8,
+      "word_ids": []
     }
   ],
   "scene_3_kalibo_town_proper_reunion": [
