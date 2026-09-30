@@ -749,9 +749,13 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
                 }
                 onSelect(visual.kind === "choice" ? { kind: "choice", sceneIndex: visual.sceneIndex, choiceIndex: visual.choiceIndex! } : { kind: "scene", sceneIndex: visual.sceneIndex });
               }}>
-                <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isPhraseBuilderNode(source) ? "PHRASE BUILDER" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
-                <strong>{visual.kind === "choice" ? label || "Empty choice" : label}</strong>
-                <small>{visual.kind === "choice" ? `→ ${source && isDialogueNode(source) && source.choices?.[visual.choiceIndex!]?.next !== null ? `Node #${source.choices![visual.choiceIndex!].next}` : "End"}` : isPhraseBuilderNode(source) ? `✓ ${source.success ?? "End"} · ✕ ${source.failure ?? "End"}` : `#${visual.sceneIndex}`}</small>
+                <span className="scene-graph-node-meta">
+                  <span className="scene-graph-node-speaker">{visual.kind === "choice" ? "—" : isDialogueNode(source) ? source.speaker || "—" : "—"}</span>
+                  <span className="scene-graph-node-divider">|</span>
+                  <span className="scene-graph-node-type">{visual.kind === "choice" ? "CHOICE" : isStartRouter(source) ? "START" : isPhraseBuilderNode(source) ? "PHRASE BUILDER" : isDialogueNode(source) && source.choices?.length ? "PROMPT" : "DIALOGUE"}</span>
+                </span>
+                <span className="scene-graph-node-content">{visual.kind === "choice" ? label || "Empty choice" : label}</span>
+                <span className="scene-graph-node-footer"><span>#{visual.sceneIndex}</span></span>
               </button>
             );
           })}
