@@ -185,6 +185,10 @@
       "type": "dialogue",
       "choices": [
         {
+          "label": "Yes",
+          "next": null
+        },
+        {
           "label": "New choice",
           "next": null
         }
