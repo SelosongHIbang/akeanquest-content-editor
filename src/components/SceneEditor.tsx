@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import wordBank from "../data/word_bank.json";
 import type { Scene, IdlePool, DialogueNode as DialogueNodeType, Choice, StartRouter } from "../types/content";
+import { resolveWordReferences, syncWordIdsFromText, type WordBankReferenceEntry } from "../utils/wordReferences";
 
 type SceneEditorProps = {
   name: string;
@@ -9,6 +10,7 @@ type SceneEditorProps = {
   onChange: (updatedData: Scene | IdlePool) => void;
   onSave?: () => void;
   onArchive?: () => void;
+  wordBank: WordBankReferenceEntry[];
 };
 
 type Point = { x: number; y: number };
@@ -270,14 +272,10 @@ function autoLayout(scene: Scene): Record<string, Point> {
   return positions;
 }
 
-type WordBankEntry = {
-  id: string;
-  akeanon: string;
+type WordBankEntry = WordBankReferenceEntry & {
   gloss: string;
   area: string;
 };
-
-const WORD_BANK: WordBankEntry[] = wordBank.words;
 
 function WordIdPicker({
   value,
@@ -285,6 +283,7 @@ function WordIdPicker({
 }: {
   value: string[];
   onChange: (wordIds: string[]) => void;
+  wordBank: WordBankEntry[];
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -293,16 +292,16 @@ function WordIdPicker({
   const normalizedQuery = query.trim().toLocaleLowerCase();
 
   const matches = useMemo(() => {
-    if (!normalizedQuery) return WORD_BANK.slice(0, 12);
-    return WORD_BANK.filter((word) =>
+    if (!normalizedQuery) return wordBank.slice(0, 12);
+    return wordBank.filter((word) =>
       [word.id, word.akeanon, word.gloss, word.area]
         .some((field) => field.toLocaleLowerCase().includes(normalizedQuery))
     ).slice(0, 20);
-  }, [normalizedQuery]);
+  }, [normalizedQuery, wordBank]);
 
   const selectedEntries = useMemo(
-    () => selected.map((id) => WORD_BANK.find((word) => word.id === id)).filter(Boolean) as WordBankEntry[],
-    [selected],
+    () => selected.map((id) => wordBank.find((word) => word.id === id)).filter(Boolean) as WordBankEntry[],
+    [selected, wordBank],
   );
 
   function addWord(id: string) {
@@ -370,7 +369,7 @@ function WordIdPicker({
         </div>
       )}
 
-      {selected.some((id) => !WORD_BANK.some((word) => word.id === id)) && (
+      {selected.some((id) => !wordBank.some((word) => word.id === id)) && (
         <small className="word-id-picker-warning">Some saved IDs are not in the current word bank.</small>
       )}
     </div>
@@ -389,6 +388,7 @@ function SceneInspector({
   onDuplicate,
   onDelete,
   onSelectChoice,
+  wordBank,
 }: {
   scene: Scene;
   selected: SelectedNode | null;
@@ -397,6 +397,7 @@ function SceneInspector({
   onDuplicate: (index: number) => void;
   onDelete: (index: number) => void;
   onSelectChoice: (choiceIndex: number) => void;
+  wordBank: WordBankEntry[];
 }) {
   if (!selected) return <aside className="scene-inspector"><div className="scene-inspector-empty"><strong>No node selected</strong><span>Select a node in the graph to edit its data.</span></div></aside>;
 
@@ -447,9 +448,11 @@ function SceneInspector({
       <div className="scene-inspector-header"><span>{node.choices?.length ? "USER PROMPT" : "DIALOGUE"}</span><strong>Node #{selected.sceneIndex}</strong><small>{node.speaker || "No speaker"}</small></div>
       <div className="scene-inspector-body">
         <Field label="Speaker"><input value={node.speaker} onChange={(e) => update("speaker", e.target.value)} placeholder="Speaker" /></Field>
-        <Field label={node.choices?.length ? "User Prompt" : "Dialogue"}><textarea value={node.text} onChange={(e) => update("text", e.target.value)} rows={8} /></Field>
+        <Field label={node.choices?.length ? "User Prompt" : "Dialogue"}><textarea value={node.text} onChange={(e) => updateText(e.target.value)} rows={8} /></Field>
         <Field label="Translation"><textarea value={node.translation ?? ""} onChange={(e) => update("translation", e.target.value || undefined)} rows={5} /></Field>
-        <Field label="Word IDs"><WordIdPicker value={node.word_ids ?? []} onChange={(wordIds) => update("word_ids", wordIds)} /><small>Search the word bank by Akeanon word, ID, or English gloss.</small></Field>
+        <Field label="Word IDs"><WordIdPicker value={node.word_ids ?? []} onChange={(wordIds) => update("word_ids", wordIds)} wordBank={wordBank} />
+          {wordResolution.unresolved.length ? <small className="word-id-picker-warning">Unresolved \\ references: {wordResolution.unresolved.map((word) => `\\${word}`).join(", ")}</small> : null}
+          <small>{wordResolution.wordIds.length ? "Generated from \\word references in the text. They update when the word bank IDs change." : "Search the word bank by Akeanon word, ID, or English gloss. Type \\word in the text to link it automatically."}</small></Field>
         <Field label="Next"><select value={node.next ?? ""} onChange={(e) => update("next", e.target.value === "" ? null : Number(e.target.value))}><option value="">End</option>{scene.map((_, i) => <option key={i} value={i}>Node #{i} — {title(scene[i], i)}</option>)}</select></Field>
         <Field label="Set Flag on Enter"><input value={node.set_flag_on_enter ?? ""} onChange={(e) => update("set_flag_on_enter", e.target.value || undefined)} placeholder="optional flag" /></Field>
         <div className="scene-inspector-section"><div className="scene-inspector-section-title">Choices</div>{node.choices?.map((choice, i) => <button key={i} type="button" className="scene-inspector-choice" onClick={() => onSelectChoice(i)}><span>#{i + 1}</span>{choice.label || "Empty choice"}</button>)}<button type="button" onClick={() => onChange(selected.sceneIndex, { ...node, choices: [...(node.choices ?? []), { label: "New choice", next: null }] })}>+ Add Choice</button></div>
@@ -463,10 +466,12 @@ function IdlePoolInspector({
   pool,
   selected,
   onChange,
+  wordBank,
 }: {
   pool: IdlePool;
   selected: Extract<SelectedNode, { kind: "idle" }> | null;
   onChange: (tier: keyof IdlePool, index: number, entry: IdlePool[keyof IdlePool][number]) => void;
+  wordBank: WordBankEntry[];
 }) {
   if (!selected) return <aside className="scene-inspector"><div className="scene-inspector-empty"><strong>No idle node selected</strong><span>Select an idle node from the pool to edit it.</span></div></aside>;
 
@@ -476,6 +481,12 @@ function IdlePoolInspector({
 
   const update = <K extends keyof typeof entry>(field: K, value: (typeof entry)[K]) =>
     onChange(selected.tier, selected.index, { ...entry, [field]: value });
+  const updateText = (text: string) => onChange(selected.tier, selected.index, {
+    ...entry,
+    text,
+    word_ids: syncWordIdsFromText(text, entry.word_ids, wordBank),
+  });
+  const wordResolution = resolveWordReferences(entry.text, wordBank);
 
   return (
     <aside className="scene-inspector">
@@ -486,10 +497,11 @@ function IdlePoolInspector({
       </div>
       <div className="scene-inspector-body">
         <Field label="Speaker"><input value={entry.speaker} onChange={(e) => update("speaker", e.target.value)} placeholder="Speaker" /></Field>
-        <Field label="Dialogue"><textarea value={entry.text} onChange={(e) => update("text", e.target.value)} rows={8} /></Field>
+        <Field label="Dialogue"><textarea value={entry.text} onChange={(e) => updateText(e.target.value)} rows={8} /></Field>
         <Field label="Word IDs">
-          <WordIdPicker value={entry.word_ids ?? []} onChange={(wordIds) => update("word_ids", wordIds)} />
-          <small>Search the word bank by Akeanon word, ID, or English gloss.</small>
+          <WordIdPicker value={entry.word_ids ?? []} onChange={(wordIds) => update("word_ids", wordIds)} wordBank={wordBank} />
+          {wordResolution.unresolved.length ? <small className="word-id-picker-warning">Unresolved \\ references: {wordResolution.unresolved.map((word) => `\\${word}`).join(", ")}</small> : null}
+          <small>{wordResolution.wordIds.length ? "Generated from \\word references in the text. They update when the word bank IDs change." : "Search the word bank by Akeanon word, ID, or English gloss. Type \\word in the text to link it automatically."}</small>
         </Field>
       </div>
     </aside>
@@ -629,7 +641,7 @@ function SceneMap({ scene, selected, onSelect }: { scene: Scene; selected: Selec
   );
 }
 
-export default function SceneEditor({ name, data, onChange, onSave, onArchive }: SceneEditorProps) {
+export default function SceneEditor({ name, data, onChange, onSave, onArchive, wordBank }: SceneEditorProps) {
   const sceneData = data && isScene(data) ? data : null;
   const idlePoolData = data && !isScene(data) ? data : null;
   const [selected, setSelected] = useState<SelectedNode | null>(
@@ -701,12 +713,12 @@ export default function SceneEditor({ name, data, onChange, onSave, onArchive }:
       ) : idlePoolData ? (
         <div className="scene-editor-body">
           <IdlePoolMap pool={idlePoolData} selected={selected?.kind === "idle" ? selected : null} onSelect={setSelected} />
-          <IdlePoolInspector pool={idlePoolData} selected={selected?.kind === "idle" ? selected : null} onChange={updateIdle} />
+          <IdlePoolInspector pool={idlePoolData} selected={selected?.kind === "idle" ? selected : null} onChange={updateIdle} wordBank={wordBank} />
         </div>
       ) : (
         <div className="scene-editor-body">
           <SceneMap scene={sceneData!} selected={selected} onSelect={setSelected} />
-          <SceneInspector scene={sceneData!} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} />
+          <SceneInspector scene={sceneData!} selected={selected} onChange={updateNode} onAdd={addNode} onDuplicate={duplicateNode} onDelete={deleteNode} onSelectChoice={(choiceIndex) => setSelected({ kind: "choice", sceneIndex: selected?.kind === "scene" ? selected.sceneIndex : 0, choiceIndex })} wordBank={wordBank} />
         </div>
       )}
     </div>
