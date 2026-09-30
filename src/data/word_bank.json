@@ -3,7 +3,7 @@
     {
       "id": "w001",
       "akeanon": "Agahon",
-      "category": "Proper Noun (N)",
+      "category": "Noun (n)",
       "area": "chapter1",
       "gloss": "morning",
       "verified": false,
@@ -14,7 +14,7 @@
       "akeanon": "Aklan",
       "category": "Proper Noun (N)",
       "area": "chapter1",
-      "gloss": "Province in the Philippines",
+      "gloss": "a province in the Philippines",
       "verified": false,
       "source": ""
     },
@@ -50,7 +50,7 @@
       "akeanon": "Apo",
       "category": "Noun (n)",
       "area": "chapter1",
-      "gloss": "grandchild / Grandchild",
+      "gloss": "grandchild",
       "verified": false,
       "source": ""
     },
@@ -309,9 +309,9 @@
     {
       "id": "w035",
       "akeanon": "Abo",
-      "category": "",
+      "category": "Adjective (adj.)",
       "area": "chapter2",
-      "gloss": "many / Many",
+      "gloss": "many",
       "verified": false,
       "source": ""
     },
