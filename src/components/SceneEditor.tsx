@@ -158,67 +158,108 @@ function autoLayout(scene: Scene): Record<string, Point> {
       : [];
   };
 
+  const allVisuals = visuals(scene);
+  const visualIds = new Set(allVisuals.map((visual) => visual.id));
+  const outgoingById = new Map<string, string[]>();
+
+  allVisuals.forEach((visual) => {
+    outgoingById.set(
+      visual.id,
+      outgoing(visual.id).filter((child) => visualIds.has(child)),
+    );
+  });
+
+  // Build incoming-edge counts for the reachable graph. A node is only
+  // assigned its final column after all of its incoming nodes have been
+  // processed, so a later/rightmost precursor cannot be overwritten.
   const root = sceneId(0);
-  column.set(root, 0);
-  row.set(root, 0);
-  queue.push(root);
+  const reachable = new Set<string>();
+  const discoverQueue = [root];
 
-  while (queue.length) {
-    const parent = queue.shift()!;
-    const parentColumn = column.get(parent)!;
-    const parentRow = row.get(parent)!;
-    const children = outgoing(parent);
+  while (discoverQueue.length) {
+    const id = discoverQueue.shift()!;
+    if (reachable.has(id)) continue;
+    reachable.add(id);
 
-    children.forEach((child, childIndex) => {
-      // The first outgoing node stays on the parent's row. Each subsequent
-      // outgoing node moves exactly one row downward.
-      if (column.has(child)) return;
-
-      column.set(child, parentColumn + 1);
-      row.set(child, parentRow + childIndex);
-      queue.push(child);
+    (outgoingById.get(id) ?? []).forEach((child) => {
+      if (!reachable.has(child)) discoverQueue.push(child);
     });
   }
 
-  // If a node has incoming nodes in different columns, it belongs in
-  // the column immediately after the rightmost incoming node.
-  const incomingColumns = new Map<string, number[]>();
+  const incomingCount = new Map<string, number>();
+  allVisuals.forEach((visual) => {
+    if (reachable.has(visual.id)) incomingCount.set(visual.id, 0);
+  });
 
-  visuals(scene).forEach((visual) => {
-    outgoing(visual.id).forEach((child) => {
-      const columns = incomingColumns.get(child) ?? [];
-      columns.push(column.get(visual.id) ?? 0);
-      incomingColumns.set(child, columns);
+  reachable.forEach((parent) => {
+    (outgoingById.get(parent) ?? []).forEach((child) => {
+      if (reachable.has(child)) {
+        incomingCount.set(child, (incomingCount.get(child) ?? 0) + 1);
+      }
     });
   });
 
-  incomingColumns.forEach((incoming, target) => {
-    if (incoming.length < 2) return;
-    const rightmostIncoming = Math.max(...incoming);
-    column.set(target, rightmostIncoming + 1);
-  });
+  column.set(root, 0);
+  row.set(root, 0);
 
-  // Propagate the resulting column change through downstream nodes while
-  // preserving their existing row assignments.
-  for (let pass = 0; pass < visuals(scene).length; pass += 1) {
-    visuals(scene).forEach((visual) => {
-      const parentColumn = column.get(visual.id);
-      if (parentColumn === undefined) return;
+  // The start node is the fixed root. Any back-edge into it must not prevent
+  // the rest of the reachable graph from being laid out.
+  incomingCount.set(root, 0);
 
-      outgoing(visual.id).forEach((child) => {
-        const childIncoming = incomingColumns.get(child) ?? [];
-        if (childIncoming.length >= 2) {
-          const rightmostIncoming = Math.max(
-            ...childIncoming.map((_, index) => {
-              const parent = visuals(scene).find((candidate) => outgoing(candidate.id).includes(child));
-              return parent ? column.get(parent.id) ?? 0 : 0;
-            }),
-          );
-          column.set(child, rightmostIncoming + 1);
-        } else if (!column.has(child)) {
-          column.set(child, parentColumn + 1);
-        }
-      });
+  const layoutQueue: string[] = [root];
+
+  while (layoutQueue.length) {
+    const parent = layoutQueue.shift()!;
+    const parentColumn = column.get(parent) ?? 0;
+    const parentRow = row.get(parent) ?? 0;
+    const children = outgoingById.get(parent) ?? [];
+
+    children.forEach((child, childIndex) => {
+      const candidateColumn = parentColumn + 1;
+
+      // Rule 1: every outgoing node is in the next column.
+      // Rule 2: when there are multiple precursors, this naturally becomes
+      // one column after the rightmost precursor.
+      column.set(
+        child,
+        Math.max(column.get(child) ?? 0, candidateColumn),
+      );
+
+      // Keep the first precursor's row assignment; Rule 2 affects only
+      // the column for now.
+      if (!row.has(child)) {
+        row.set(child, parentRow + childIndex);
+      }
+
+      const remaining = (incomingCount.get(child) ?? 0) - 1;
+      incomingCount.set(child, remaining);
+
+      if (remaining === 0) {
+        layoutQueue.push(child);
+      }
+    });
+  }
+
+  // If a connected graph contains a cycle, the cyclic portion cannot be
+  // topologically ordered. Give any still-unplaced reachable nodes a
+  // deterministic fallback without changing the rules for normal DAGs.
+  const cycleQueue = [root];
+  const cycleSeen = new Set<string>();
+
+  while (cycleQueue.length) {
+    const parent = cycleQueue.shift()!;
+    if (cycleSeen.has(parent)) continue;
+    cycleSeen.add(parent);
+
+    const parentColumn = column.get(parent) ?? 0;
+    const parentRow = row.get(parent) ?? 0;
+
+    (outgoingById.get(parent) ?? []).forEach((child, childIndex) => {
+      if (!column.has(child)) {
+        column.set(child, parentColumn + 1);
+        row.set(child, parentRow + childIndex);
+      }
+      cycleQueue.push(child);
     });
   }
 
