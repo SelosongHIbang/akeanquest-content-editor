@@ -2,7 +2,7 @@
   "words": [
     {
       "id": "w001",
-      "akeanon": "Agahon",
+      "akeanon": "agahon",
       "category": "Noun (n)",
       "area": "chapter1",
       "gloss": "morning",
@@ -20,7 +20,7 @@
     },
     {
       "id": "w003",
-      "akeanon": "Ako",
+      "akeanon": "ako",
       "category": "Pronoun (pro)",
       "area": "chapter1",
       "gloss": "I / me",
@@ -29,7 +29,7 @@
     },
     {
       "id": "w004",
-      "akeanon": "Ama",
+      "akeanon": "ama",
       "category": "Noun (n)",
       "area": "chapter1",
       "gloss": "father",
@@ -47,7 +47,7 @@
     },
     {
       "id": "w006",
-      "akeanon": "Apo",
+      "akeanon": "apo",
       "category": "Noun (n)",
       "area": "chapter1",
       "gloss": "grandchild",
@@ -56,17 +56,17 @@
     },
     {
       "id": "w007",
-      "akeanon": "Baeay",
-      "category": "",
+      "akeanon": "baeay",
+      "category": "Noun (n)",
       "area": "chapter1",
-      "gloss": "House / house",
+      "gloss": "house",
       "verified": false,
       "source": ""
     },
     {
       "id": "w008",
       "akeanon": "balikbayan",
-      "category": "",
+      "category": "Noun (n)",
       "area": "chapter1",
       "gloss": "A person or people that went to other country and came home to their native land",
       "verified": false,
@@ -308,7 +308,7 @@
     },
     {
       "id": "w035",
-      "akeanon": "Abo",
+      "akeanon": "abo",
       "category": "Adjective (adj.)",
       "area": "chapter2",
       "gloss": "many",
@@ -317,7 +317,7 @@
     },
     {
       "id": "w036",
-      "akeanon": "Agtunan",
+      "akeanon": "agtunan",
       "category": "Verb (v)",
       "area": "chapter2",
       "gloss": "to visit, to go to",
@@ -327,16 +327,16 @@
     {
       "id": "w037",
       "akeanon": "Akeanon",
-      "category": "",
+      "category": "Proper Noun (N)",
       "area": "chapter2",
-      "gloss": "The people born(living) in Aklan",
+      "gloss": "the language spoken by the people of Aklan",
       "verified": false,
       "source": ""
     },
     {
       "id": "w038",
-      "akeanon": "Alin",
-      "category": "",
+      "akeanon": "alin",
+      "category": "Pronoun (pro)",
       "area": "chapter2",
       "gloss": "what",
       "verified": false,
@@ -345,7 +345,7 @@
     {
       "id": "w039",
       "akeanon": "An-om",
-      "category": "",
+      "category": "Proper Noun (N)",
       "area": "chapter2",
       "gloss": "six",
       "verified": false,
@@ -353,17 +353,17 @@
     },
     {
       "id": "w040",
-      "akeanon": "Anong",
-      "category": "",
+      "akeanon": "manong",
+      "category": "Noun (n)",
       "area": "chapter2",
-      "gloss": "Older brother",
+      "gloss": "older brother",
       "verified": false,
       "source": ""
     },
     {
       "id": "w041",
-      "akeanon": "Asul",
-      "category": "",
+      "akeanon": "asul",
+      "category": "Noun (n)",
       "area": "chapter2",
       "gloss": "blue",
       "verified": false,
@@ -372,7 +372,7 @@
     {
       "id": "w042",
       "akeanon": "aton",
-      "category": "",
+      "category": "Pronoun (pro)",
       "area": "chapter2",
       "gloss": "our",
       "verified": false,
@@ -1037,28 +1037,28 @@
     },
     {
       "id": "w116",
-      "akeanon": "Abot",
-      "category": "",
+      "akeanon": "abot",
+      "category": "Verb (v)",
       "area": "chapter3",
-      "gloss": "Reach/ Arrive",
+      "gloss": "reach, arrive",
       "verified": false,
       "source": ""
     },
     {
       "id": "w117",
-      "akeanon": "Ag",
-      "category": "",
+      "akeanon": "ag",
+      "category": "Conjunction (conj.)",
       "area": "chapter3",
-      "gloss": "And / and",
+      "gloss": "and",
       "verified": false,
       "source": ""
     },
     {
       "id": "w118",
-      "akeanon": "Amon",
-      "category": "",
+      "akeanon": "amon",
+      "category": "Pronoun (pro)",
       "area": "chapter3",
-      "gloss": "Our",
+      "gloss": "our",
       "verified": false,
       "source": ""
     },
@@ -1442,10 +1442,10 @@
     },
     {
       "id": "w161",
-      "akeanon": "Adlaw",
-      "category": "",
+      "akeanon": "adlaw",
+      "category": "Noun (n)",
       "area": "chapter4",
-      "gloss": "Day/ Sun",
+      "gloss": "day, the sun",
       "verified": false,
       "source": ""
     },
@@ -1874,8 +1874,8 @@
     },
     {
       "id": "w209",
-      "akeanon": "Amiga",
-      "category": "",
+      "akeanon": "amiga",
+      "category": "Noun (n)",
       "area": "chapter6",
       "gloss": "friend (female)",
       "verified": false,
@@ -1883,8 +1883,8 @@
     },
     {
       "id": "w210",
-      "akeanon": "Amigo",
-      "category": "",
+      "akeanon": "amigo",
+      "category": "Noun (n)",
       "area": "chapter6",
       "gloss": "friend (male)",
       "verified": false,
@@ -1892,8 +1892,8 @@
     },
     {
       "id": "w211",
-      "akeanon": "Asukar",
-      "category": "",
+      "akeanon": "asukar",
+      "category": "Noun (n)",
       "area": "chapter6",
       "gloss": "sugar",
       "verified": false,
@@ -1902,9 +1902,9 @@
     {
       "id": "w212",
       "akeanon": "ayaw",
-      "category": "",
+      "category": "Negative (Neg)",
       "area": "chapter6",
-      "gloss": "Don’t",
+      "gloss": "do not",
       "verified": false,
       "source": ""
     },
@@ -2172,7 +2172,7 @@
     {
       "id": "w242",
       "akeanon": "adto/agto",
-      "category": "v",
+      "category": "Verb (v)",
       "area": "chapter2",
       "gloss": "to go, to visit",
       "verified": false,
@@ -2194,6 +2194,15 @@
       "area": "chapter4",
       "gloss": "broken, damaged, destroyed, ruined",
       "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w246",
+      "akeanon": "akeanon",
+      "category": "Adjective (adj.)",
+      "area": "chapter1",
+      "gloss": "things or prople from Aklan",
+      "verified": true,
       "source": ""
     }
   ]
