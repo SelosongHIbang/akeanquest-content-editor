@@ -1316,6 +1316,15 @@
     },
     {
       "id": "w147",
+      "akeanon": "makauli",
+      "category": "Verb (v)",
+      "area": "chapter1",
+      "gloss": "To go home",
+      "verified": false,
+      "source": ""
+    },
+    {
+      "id": "w148",
       "akeanon": "makita",
       "category": "",
       "area": "chapter2",
@@ -1324,7 +1333,7 @@
       "source": ""
     },
     {
-      "id": "w148",
+      "id": "w149",
       "akeanon": "malimpyo",
       "category": "",
       "area": "chapter4",
@@ -1333,7 +1342,7 @@
       "source": ""
     },
     {
-      "id": "w149",
+      "id": "w150",
       "akeanon": "maliya",
       "category": "",
       "area": "chapter3",
@@ -1342,7 +1351,7 @@
       "source": ""
     },
     {
-      "id": "w150",
+      "id": "w151",
       "akeanon": "man",
       "category": "",
       "area": "chapter3",
@@ -1351,7 +1360,7 @@
       "source": ""
     },
     {
-      "id": "w151",
+      "id": "w152",
       "akeanon": "manok",
       "category": "",
       "area": "chapter2",
@@ -1360,7 +1369,7 @@
       "source": ""
     },
     {
-      "id": "w152",
+      "id": "w153",
       "akeanon": "manong",
       "category": "Noun (n)",
       "area": "chapter2",
@@ -1369,7 +1378,7 @@
       "source": ""
     },
     {
-      "id": "w153",
+      "id": "w154",
       "akeanon": "mapa",
       "category": "",
       "area": "chapter2",
@@ -1378,7 +1387,7 @@
       "source": ""
     },
     {
-      "id": "w154",
+      "id": "w155",
       "akeanon": "mas",
       "category": "",
       "area": "chapter2",
@@ -1387,7 +1396,7 @@
       "source": ""
     },
     {
-      "id": "w155",
+      "id": "w156",
       "akeanon": "masamad",
       "category": "",
       "area": "chapter4",
@@ -1396,7 +1405,7 @@
       "source": ""
     },
     {
-      "id": "w156",
+      "id": "w157",
       "akeanon": "masimba",
       "category": "",
       "area": "chapter2",
@@ -1405,7 +1414,7 @@
       "source": ""
     },
     {
-      "id": "w157",
+      "id": "w158",
       "akeanon": "masunod",
       "category": "",
       "area": "chapter2",
@@ -1414,7 +1423,7 @@
       "source": ""
     },
     {
-      "id": "w158",
+      "id": "w159",
       "akeanon": "matam-is",
       "category": "",
       "area": "chapter2",
@@ -1423,7 +1432,7 @@
       "source": ""
     },
     {
-      "id": "w159",
+      "id": "w160",
       "akeanon": "matuod",
       "category": "",
       "area": "chapter2",
@@ -1432,20 +1441,11 @@
       "source": ""
     },
     {
-      "id": "w160",
+      "id": "w161",
       "akeanon": "maugan",
       "category": "",
       "area": "chapter3",
       "gloss": "Light",
-      "verified": false,
-      "source": ""
-    },
-    {
-      "id": "w161",
-      "akeanon": "makauli",
-      "category": "Verb (v)",
-      "area": "chapter1",
-      "gloss": "To go home",
       "verified": false,
       "source": ""
     },
