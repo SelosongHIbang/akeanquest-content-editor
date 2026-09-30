@@ -495,7 +495,7 @@ function SceneInspector({
       onChange(selected.sceneIndex, {
         type: "start_router",
         start_index_if_flag: {
-          default: isStartRouter(node) ? node.start_index_if_flag.default : node.next ?? null,
+          default: isStartRouter(node) ? node.start_index_if_flag.default : isDialogueNode(node) || isPhraseBuilderNode(node) ? node.next : null,
         },
       });
     }
