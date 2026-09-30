@@ -190,7 +190,7 @@
         },
         {
           "label": "No",
-          "next": null
+          "next": 8
         }
       ]
     }
