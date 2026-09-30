@@ -186,7 +186,7 @@
       "choices": [
         {
           "label": "Yes",
-          "next": null
+          "next": 8
         },
         {
           "label": "No",
