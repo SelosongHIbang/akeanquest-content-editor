@@ -536,7 +536,8 @@ function SceneInspector({
         </div></Field>
         <Field label="Choices"><div className="phrase-choice-list">{node.choices.map((word,i)=><span className="word-id-chip" key={word+i}><span>{word}</span></span>)}</div><small>Correct answer words + 1–2 random words already referenced in this scene.</small><button type="button" onClick={()=>update("choices",regenerateChoices(node.answer))}>↻ Regenerate distractors</button></Field>
         <Field label="Translation"><textarea value={node.translation ?? ""} onChange={(e)=>update("translation",e.target.value||undefined)} rows={4}/></Field>
-        <Field label="Next"><select value={node.next ?? ""} onChange={(e)=>update("next",e.target.value===""?null:Number(e.target.value))}><option value="">End</option>{scene.map((_,i)=><option key={i} value={i}>Node #{i} — {title(scene[i],i)}</option>)}</select></Field>
+        <Field label="Success"><select value={node.success ?? ""} onChange={(e)=>update("success", e.target.value === "" ? null : Number(e.target.value))}><option value="">End</option>{scene.map((_, i) => <option key={i} value={i}>Node #{i} — {title(scene[i], i)}</option>)}</select></Field>
+        <Field label="Failure"><select value={node.failure ?? ""} onChange={(e)=>update("failure", e.target.value === "" ? null : Number(e.target.value))}><option value="">End</option>{scene.map((_, i) => <option key={i} value={i}>Node #{i} — {title(scene[i], i)}</option>)}</select></Field>
         <div className="scene-inspector-actions"><button type="button" onClick={()=>onAdd(selected.sceneIndex)}>+ Dialogue Node</button><button type="button" onClick={()=>onAddPhraseBuilder(selected.sceneIndex)}>+ Phrase Builder</button><button type="button" className="danger" onClick={()=>onDelete(selected.sceneIndex)}>Delete</button></div>
       </div></aside>);
   }
