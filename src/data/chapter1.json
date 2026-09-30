@@ -178,10 +178,11 @@
       "type": "dialogue"
     },
     {
-      "speaker": "",
+      "speaker": "Lola Jonabel",
       "text": "",
       "next": 8,
-      "word_ids": []
+      "word_ids": [],
+      "type": "dialogue"
     }
   ],
   "scene_3_kalibo_town_proper_reunion": [
